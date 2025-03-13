@@ -1,0 +1,18 @@
+{
+	"folders": [
+		{
+			"name": "twsbr",
+			"path": "."
+		},
+		{
+			"name": "Robo-SelfBalance",
+			"path": "../Robo-SelfBalance"
+		}
+	],
+	"settings": {
+		"files.associations": {
+			"random": "cpp",
+			"cmath": "cpp"
+		}
+	}
+}

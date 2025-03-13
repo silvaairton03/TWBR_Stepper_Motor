@@ -1,0 +1,23 @@
+# Ignore system-generated files
+.bash_history
+.gitconfig
+*.keystore
+*.ini
+*.pub
+*.settings
+*.protobuf
+*.log
+*.lock
+.DS_Store
+
+# Ignore PlatformIO build files (if applicable)
+.pio/
+.vscode/
+build/
+
+# Ignore temporary and debugging files
+*.tmp
+*.bak
+debug.keystore
+emu-update-last-check.ini
+maps.key
