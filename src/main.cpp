@@ -5,6 +5,8 @@
 #include<AccelStepper.h>
 #include"stepper.h"
 #include"AS5600Sensor.h"
+#include"freertos/FreeRTOS.h"
+#include"freertos/task.h"
 
 #define AS5600_ADDRESS 0x36
 #define STEPS_PER_REVOLUTION 6400
