@@ -60,7 +60,7 @@ const float wheelRadius = 0.0325;
 float k[4] = {-39.5113,   -3.0546,  -10.5095,   -7.4827}; //Ts = 0.008s
 // //float k[4] = {-38.6303,   -2.9825,  -10.1185,   -7.2154}; //Ts = 0.01
 // float k[4] = {-37.5724,  -3.8561,   -9.1731,   -6.8592}; //Ts = 0.02
-float Ts = 8;
+float Ts = 50;
 float M = 0.208;
 
 const float stepAngle = 0.05625; // 1/32
@@ -216,31 +216,32 @@ void loop(){
       if (fabs(theta) < SAFE_ANGLE){
           u = -(k[0]*(theta) + k[1]*thetaRate + k[2]*pendulumPosition + k[3]*pendulumVelocity);
 
-          Fm = u / 2.0;
-          a = Fm / M;
+          // Fm = u / 2.0;
+          // a = Fm / M;
 
-          vel = lastVel + a * (Ts/1000.0);
+          // vel = lastVel + a * (Ts/1000.0);
 
-          controlSteps = (vel * STEPS_PER_REVOLUTION) / (2* PI * wheelRadius);
+          // controlSteps = (vel * STEPS_PER_REVOLUTION) / (2* PI * wheelRadius);
 
 
-          if (fabs(controlSteps) > MAX_STEPS) {
-              controlSteps = (controlSteps > 0) ? MAX_STEPS : -MAX_STEPS;
-          }
+        //   if (fabs(controlSteps) > MAX_STEPS) {
+        //       controlSteps = (controlSteps > 0) ? MAX_STEPS : -MAX_STEPS;
+        //   }
 
-          stepperLeft.setSpeed(controlSteps);
-          stepperRight.setSpeed(-controlSteps);
+        //   stepperLeft.setSpeed(controlSteps);
+        //   stepperRight.setSpeed(-controlSteps);
 
-          lastVel = vel;
+        //   lastVel = vel;
 
-        } else {
-            stepperLeft.setSpeed(0);
-            stepperRight.setSpeed(0);
-            lastVel = 0; 
-      }
+        // } else {
+        //     stepperLeft.setSpeed(0);
+        //     stepperRight.setSpeed(0);
+        //     lastVel = 0; 
+        }
       //-------------------------------------------------------------//
       prevMillis = currentMillis;
     }
+
     Serial.print(theta * 57.2958); Serial.print(",");
     Serial.print(thetaRate * 57.2958); Serial.print(",");
     Serial.print(pendulumPosition); Serial.print(",");
