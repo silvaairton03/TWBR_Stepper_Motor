@@ -92,13 +92,6 @@ void setup(){
 
     Wire.begin(21,22,800000L);
 
-    // if (mpu.begin() == 0){
-    //   Serial.println("MPU6050 connected.");
-    // } else {
-    //   Serial.println("MPU6050 not connected.");
-    // }
-    // Wire1.begin(26,25,800000L);
-
     delay(1000);
     
     // sensorRight.begin();
