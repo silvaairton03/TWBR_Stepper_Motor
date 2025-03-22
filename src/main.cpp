@@ -1,7 +1,8 @@
 
 #include <Arduino.h>
 #include <Wire.h>
-#include "MPU6050_light.h"
+// #include "MPU6050_light.h"
+#include"MeasuresIMU.h"
 #include<AccelStepper.h>
 #include"stepper.h"
 #include"AS5600Sensor.h"
@@ -14,9 +15,7 @@
 #define MAX_STEPS 8000
 #define MICROSTEP_DIVISOR 32
 
-// AS5600Sensor sensorRight(&Wire, AS5600_ADDRESS);    // This one uses the default Wire bus.
-// AS5600Sensor sensorLeft(&Wire1, AS5600_ADDRESS);
-MPU6050 mpu(Wire);
+MeasuresIMU imu(Wire);
 
 volatile bool updateMotors = false;
 
@@ -100,53 +99,47 @@ void setup(){
     // delay(2000);
 
     //------------------INICIALIZAÇÃO DOS MOTORES---------------//
-    pinMode(EN, OUTPUT);
-    pinMode(DIR, OUTPUT);
-    pinMode(STEP, OUTPUT);
-    pinMode(DIR_2, OUTPUT);
-    pinMode(STEP_2, OUTPUT);
-    digitalWrite(EN, LOW);
+    // pinMode(EN, OUTPUT);
+    // pinMode(DIR, OUTPUT);
+    // pinMode(STEP, OUTPUT);
+    // pinMode(DIR_2, OUTPUT);
+    // pinMode(STEP_2, OUTPUT);
+    // digitalWrite(EN, LOW);
 
-    // //MOTOR 1
-    stepperLeft.setMaxSpeed(8000);
-    stepperLeft.setAcceleration(10000);
-    stepperLeft.setSpeed(0);
+    // // //MOTOR 1
+    // stepperLeft.setMaxSpeed(8000);
+    // stepperLeft.setAcceleration(10000);
+    // stepperLeft.setSpeed(0);
     
-    // //MOTOR 2
-    stepperRight.setMaxSpeed(8000);
-    stepperRight.setAcceleration(10000);
-    stepperRight.setSpeed(0);
+    // // //MOTOR 2
+    // stepperRight.setMaxSpeed(8000);
+    // stepperRight.setAcceleration(10000);
+    // stepperRight.setSpeed(0);
 
-    Serial.println("Motores iniciliazdos.");
+    // Serial.println("Motores iniciliazdos.");
 
-    timerLeft = timerBegin(0, 80, true);    // Timer 0 for left motor
-    timerAttachInterrupt(timerLeft, &onTimerLeft, true);
-    timerAlarmWrite(timerLeft, 100, true);   // call every 100 µs (adjust as needed)
-    timerAlarmEnable(timerLeft);
+    // timerLeft = timerBegin(0, 80, true);    // Timer 0 for left motor
+    // timerAttachInterrupt(timerLeft, &onTimerLeft, true);
+    // timerAlarmWrite(timerLeft, 100, true);   // call every 100 µs (adjust as needed)
+    // timerAlarmEnable(timerLeft);
   
-    timerRight = timerBegin(1, 80, true);   // Timer 1 for right motor
-    timerAttachInterrupt(timerRight, &onTimerRight, true);
-    timerAlarmWrite(timerRight, 100, true);  // call every 100 µs
-    timerAlarmEnable(timerRight);
+    // timerRight = timerBegin(1, 80, true);   // Timer 1 for right motor
+    // timerAttachInterrupt(timerRight, &onTimerRight, true);
+    // timerAlarmWrite(timerRight, 100, true);  // call every 100 µs
+    // timerAlarmEnable(timerRight);
 
-    Serial.println("Timer inicializado");
+    // Serial.println("Timer inicializado");
 
-    delay(1000);
+    // delay(1000);
     // //------------------------------------------------------------//
 
-    //-----------------CONFIGURAÇÃO MPU6050-----------------------//
-    byte status = mpu.begin();
-    Serial.print(F("MPU6050 status: "));
-    Serial.println(status);
-    while(status!=0){ } // stop everything if could not connect to MPU6050
+    // //-----------------CONFIGURAÇÃO MPU6050-----------------------//
+    if (imu.beginWithLogging(0, 0, true) != 0) {
+      Serial.println("MPU6050 failed!");
+      while (1);
+    }
 
-    Serial.println(F("Calculating offsets, do not move MPU6050"));
-    delay(1000);
-    //mpu.upsideDownMounting = true; // uncomment this line if the MPU6050 is mounted upside-down
-    mpu.calcOffsets(); // gyro and accelero
-    Serial.println("Done!\n");
    //------------------------------------------------------------//
-
     
     delay(2000);
 }
@@ -154,93 +147,61 @@ void setup(){
 void loop(){
     currentMillis = millis();
     unsigned long timerdiff = currentMillis - prevMillis;
-    // static unsigned long lastToggleTime = 0;
-    // static bool forward = true;
+    imu.update();
 
-    // if (currentMillis - lastToggleTime >= 10000){
-    //   forward = !forward;
-    //   lastToggleTime = currentMillis;
-    // }
-    
-    mpu.update();
-    theta = mpu.getAngleY() * 0.0174533;
-    thetaRate = mpu.getGyroY() * 0.0174533;
+    theta = imu.getIMUAngleY();
+    thetaRate = imu.getIMUGyroY();
 
-    // mpu.updateMeasures();
-    // theta = mpu.getRawAngle();
-    // thetaRate = mpu.getRawGyro();
 
     pendulumPosition = stepperStates.getRobotPosition();
     pendulumVelocity = stepperStates.getRobotVelocity();
     
-
-    // sensorRight.readRawAngle();
-    // sensorRight.correctAngle();
-    // sensorRight.checkQuadrant();
-    // sensorRight.calculateRPM_noTime();
-    // totalAngleRightMotor = sensorRight.getRightWheelAngle();
-    // angularSpeedRightMotor = sensorRight.getRadSpeedRight();
-    
-    // sensorLeft.readRawAngle();
-    // sensorLeft.correctAngle();
-    // sensorLeft.checkQuadrant();
-    // sensorLeft.calculateRPM_noTime();
-    // totalAngleLeftMotor = sensorLeft.getLeftWheelAngle();
-    // angularSpeedLeftMotor = sensorLeft.getRadSpeedLeft();
-
-    // yawMagEncoder = yawAS5600(totalAngleLeftMotor, totalAngleRightMotor);
 
     float Fm = 0.0;
     float a = 0.0;
     float vel = 0.0;
     float controlSteps = 0.0;
 
-    // if (forward){
-    //   stepperLeft.setSpeed(500);
-    //   stepperRight.setSpeed(-500);
-    // } else {
-    //   stepperLeft.setSpeed(-500);
-    //   stepperRight.setSpeed(500);
-    // }
-
     if (timerdiff >= Ts){
       stepperStates.update();
         
 
       // //-------------------CONTROLADOR LQR---------------------------//
-      if (fabs(theta) < SAFE_ANGLE){
-          u = -(k[0]*(theta) + k[1]*thetaRate + k[2]*pendulumPosition + k[3]*pendulumVelocity);
+      // if (fabs(theta) < SAFE_ANGLE){
+      //     u = -(k[0]*(theta) + k[1]*thetaRate + k[2]*pendulumPosition + k[3]*pendulumVelocity);
 
-          Fm = u / 2.0;
-          a = Fm / M;
+      //     Fm = u / 2.0;
+      //     a = Fm / M;
 
-          vel = lastVel + a * (Ts/1000.0);
+      //     vel = lastVel + a * (Ts/1000.0);
 
-          controlSteps = (vel * STEPS_PER_REVOLUTION) / (2* PI * wheelRadius);
+      //     controlSteps = (vel * STEPS_PER_REVOLUTION) / (2* PI * wheelRadius);
 
 
-          if (fabs(controlSteps) > MAX_STEPS) {
-              controlSteps = (controlSteps > 0) ? MAX_STEPS : -MAX_STEPS;
-          }
+      //     if (fabs(controlSteps) > MAX_STEPS) {
+      //         controlSteps = (controlSteps > 0) ? MAX_STEPS : -MAX_STEPS;
+      //     }
 
-          stepperLeft.setSpeed(controlSteps);
-          stepperRight.setSpeed(-controlSteps);
+      //     stepperLeft.setSpeed(controlSteps);
+      //     stepperRight.setSpeed(-controlSteps);
 
-          lastVel = vel;
+      //     lastVel = vel;
 
-        } else {
-            stepperLeft.setSpeed(0);
-            stepperRight.setSpeed(0);
-            lastVel = 0; 
-      }
+      //   } else {
+      //       stepperLeft.setSpeed(0);
+      //       stepperRight.setSpeed(0);
+      //       lastVel = 0; 
+      // }
       //-------------------------------------------------------------//
       prevMillis = currentMillis;
     }
-    Serial.print(theta * 57.2958); Serial.print(",");
-    Serial.print(thetaRate * 57.2958); Serial.print(",");
-    Serial.print(pendulumPosition); Serial.print(",");
-    Serial.print(pendulumVelocity); Serial.print(",");
-    Serial.println(u);
+    // Serial.print(theta * 57.2958); Serial.print(",");
+    // Serial.println(thetaRate * 57.2958);
+    Serial.print(theta); Serial.print(",");
+    Serial.println(thetaRate);
+    // Serial.print(pendulumPosition); Serial.print(",");
+    // Serial.print(pendulumVelocity); Serial.print(",");
+    // Serial.println(u);
 }
 
 

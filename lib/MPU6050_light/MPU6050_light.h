@@ -60,13 +60,23 @@ class MPU6050{
 	void setFilterAccCoef(float acc_coeff);
 
 	// MPU CONFIG GETTER
-	float getGyroXoffset(){ return gyroXoffset; };
-    float getGyroYoffset(){ return gyroYoffset; };
-    float getGyroZoffset(){ return gyroZoffset; };
+	// float getGyroXoffset(){ return gyroXoffset; };
+    // float getGyroYoffset(){ return gyroYoffset; };
+    // float getGyroZoffset(){ return gyroZoffset; };
 	
-	float getAccXoffset(){ return accXoffset; };
-	float getAccYoffset(){ return accYoffset; };
-	float getAccZoffset(){ return accZoffset; };
+	// float getAccXoffset(){ return accXoffset; };
+	// float getAccYoffset(){ return accYoffset; };
+	// float getAccZoffset(){ return accZoffset; };
+
+	// --- New Getter Methods ---
+	float getGyroXOffset() const { return gyroXoffset; }
+	float getGyroYOffset() const { return gyroYoffset; }
+	float getGyroZOffset() const { return gyroZoffset; }
+
+	float getAccXOffset() const { return accXoffset; }
+	float getAccYOffset() const { return accYoffset; }
+	float getAccZOffset() const { return accZoffset; }
+
 	
 	float getFilterGyroCoef(){ return filterGyroCoef; };
 	float getFilterAccCoef(){ return 1.0-filterGyroCoef; };
