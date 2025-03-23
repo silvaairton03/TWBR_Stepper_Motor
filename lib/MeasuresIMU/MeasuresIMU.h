@@ -13,8 +13,16 @@ public:
     // Método de inicialização com possibilidade de calibrar offsets e fazer log
     byte beginWithLogging(int gyro_config_num = 0, int acc_config_num = 0, bool doOffsetCalibration = true);
 
+    void updateFilter();
+
     float getIMUAngleY();
     float getIMUGyroY();
-};
+    float getFusedRadSpeed();
+
+private:
+    float prevFilteredAngle = 0.0;
+    unsigned long prevTime = 0.0;
+    float prevFusedGyroY = 0.0;
+};  
 
 #endif

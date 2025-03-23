@@ -3,33 +3,27 @@
 MeasuresIMU::MeasuresIMU(TwoWire& w) : MPU6050(w) {}
 
 byte MeasuresIMU::beginWithLogging(int gyro_config_num, int acc_config_num, bool doOffsetCalibration) {
-    byte status = MPU6050::begin(gyro_config_num, acc_config_num);  // Call base begin()
+    byte status = MPU6050::begin(gyro_config_num, acc_config_num);
 
-    if (status != 0) {
-        Serial.println(F("MPU6050 initialization failed!"));
-        return status;
+    if (status == 0) {
+        Serial.println("MPU6050 initialized!");
+        if (doOffsetCalibration) {
+            Serial.println("Calibrating offsets...");
+            this->calcOffsets(true, true);
+            Serial.print("GyroY Offset: "); Serial.println(this->getGyroY(), 5);
+        }
+        this->update();
+        prevFilteredAngle = this->getAngleY();
+        prevTime = millis();
+    } else {
+        Serial.println("MPU6050 initialization failed!");
     }
-
-    Serial.println(F("MPU6050 initialized successfully."));
-
-    if (doOffsetCalibration) {
-        Serial.println(F("Calculating offsets..."));
-        this->calcOffsets(true, true);  // Uses the base class method
-    }
-
-    // Display the offsets using base class's getters
-    Serial.print(F("Gyro Y Offsets : "));
-    // Serial.print(this->getGyroXOffset()); Serial.print(", ");
-    Serial.println(this->getGyroYOffset());
-    // Serial.print(", ");
-    // Serial.println(this->getGyroZOffset());
-
-    Serial.print(F("Accel Offsets (X,Y,Z): "));
-    Serial.print(this->getAccXOffset()); Serial.print(", ");
-    Serial.print(this->getAccYOffset()); Serial.print(", ");
-    Serial.println(this->getAccZOffset());
 
     return status;
+}
+
+void MeasuresIMU::updateFilter(){
+    this->update();
 }
 
 float MeasuresIMU::getIMUAngleY(){
@@ -38,4 +32,27 @@ float MeasuresIMU::getIMUAngleY(){
 
 float MeasuresIMU::getIMUGyroY(){
     return this->getGyroY() * DEG_TO_RAD;
+}
+
+float MeasuresIMU::getFusedRadSpeed()
+{   
+    const float EPSILON = 1e-5; 
+    unsigned long actualTime = micros();
+    float dt = (actualTime - prevTime) / 1e-6;
+    if (dt < EPSILON) dt = EPSILON; 
+
+
+    float currentAngle = this->getAccAngleY();
+    float gyroYraw = this->getGyroY();
+
+    float radSpeedEstimate = (currentAngle - prevFilteredAngle)/dt;
+
+    const float alpha = 0.98;
+    float fusedRate = alpha * gyroYraw + (1 - alpha) * radSpeedEstimate;
+
+    prevFilteredAngle = currentAngle;
+    prevTime = actualTime;
+    prevFusedGyroY = fusedRate;
+
+    return fusedRate * DEG_TO_RAD;
 }

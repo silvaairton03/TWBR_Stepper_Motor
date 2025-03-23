@@ -51,7 +51,7 @@ float u = 0.0;
 float omega = 0.0;
 
 float theta = 0.0;
-float thetaRate = 0.0;
+float thetaRate = 0.0, fusedThetaRate = 0.0;
 const float wheelRadius = 0.0325;
 
 // float state[4] = {0, 0, 0, 0};
@@ -151,7 +151,7 @@ void loop(){
 
     theta = imu.getIMUAngleY();
     thetaRate = imu.getIMUGyroY();
-
+    fusedThetaRate = imu.getFusedRadSpeed();
 
     pendulumPosition = stepperStates.getRobotPosition();
     pendulumVelocity = stepperStates.getRobotVelocity();
@@ -166,9 +166,9 @@ void loop(){
       stepperStates.update();
         
 
-      // //-------------------CONTROLADOR LQR---------------------------//
-      // if (fabs(theta) < SAFE_ANGLE){
-      //     u = -(k[0]*(theta) + k[1]*thetaRate + k[2]*pendulumPosition + k[3]*pendulumVelocity);
+      //-------------------CONTROLADOR LQR---------------------------//
+      if (fabs(theta) < SAFE_ANGLE){
+          u = -(k[0]*(theta) + k[1]*fusedThetaRate + k[2]*pendulumPosition + k[3]*pendulumVelocity);
 
       //     Fm = u / 2.0;
       //     a = Fm / M;
@@ -191,14 +191,15 @@ void loop(){
       //       stepperLeft.setSpeed(0);
       //       stepperRight.setSpeed(0);
       //       lastVel = 0; 
-      // }
+      }
       //-------------------------------------------------------------//
       prevMillis = currentMillis;
     }
     // Serial.print(theta * 57.2958); Serial.print(",");
     // Serial.println(thetaRate * 57.2958);
     Serial.print(theta); Serial.print(",");
-    Serial.println(thetaRate);
+    Serial.print(fusedThetaRate); Serial.print(",");
+    Serial.println(u);
     // Serial.print(pendulumPosition); Serial.print(",");
     // Serial.print(pendulumVelocity); Serial.print(",");
     // Serial.println(u);
