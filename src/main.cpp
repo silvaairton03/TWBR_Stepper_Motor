@@ -216,27 +216,27 @@ void loop(){
       if (fabs(theta) < SAFE_ANGLE){
           u = -(k[0]*(theta) + k[1]*thetaRate + k[2]*pendulumPosition + k[3]*pendulumVelocity);
 
-          // Fm = u / 2.0;
-          // a = Fm / M;
+          Fm = u / 2.0;
+          a = Fm / M;
 
-          // vel = lastVel + a * (Ts/1000.0);
+          vel = lastVel + a * (Ts/1000.0);
 
-          // controlSteps = (vel * STEPS_PER_REVOLUTION) / (2* PI * wheelRadius);
+          controlSteps = (vel * STEPS_PER_REVOLUTION) / (2* PI * wheelRadius);
 
 
-        //   if (fabs(controlSteps) > MAX_STEPS) {
-        //       controlSteps = (controlSteps > 0) ? MAX_STEPS : -MAX_STEPS;
-        //   }
+          if (fabs(controlSteps) > MAX_STEPS) {
+              controlSteps = (controlSteps > 0) ? MAX_STEPS : -MAX_STEPS;
+          }
 
-        //   stepperLeft.setSpeed(controlSteps);
-        //   stepperRight.setSpeed(-controlSteps);
+          stepperLeft.setSpeed(controlSteps);
+          stepperRight.setSpeed(-controlSteps);
 
-        //   lastVel = vel;
+          lastVel = vel;
 
-        // } else {
-        //     stepperLeft.setSpeed(0);
-        //     stepperRight.setSpeed(0);
-        //     lastVel = 0; 
+        } else {
+            stepperLeft.setSpeed(0);
+            stepperRight.setSpeed(0);
+            lastVel = 0; 
         }
       //-------------------------------------------------------------//
       prevMillis = currentMillis;
