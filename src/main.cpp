@@ -6,8 +6,8 @@
 #include<AccelStepper.h>
 #include"stepper.h"
 #include"AS5600Sensor.h"
-#include"freertos/FreeRTOS.h"
-#include"freertos/task.h"
+// #include"freertos/FreeRTOS.h"
+// #include"freertos/task.h"
 
 #define AS5600_ADDRESS 0x36
 #define STEPS_PER_REVOLUTION 6400
@@ -18,12 +18,6 @@
 MeasuresIMU imu(Wire);
 
 volatile bool updateMotors = false;
-
-float totalAngleLeftMotor = 0, totalAngleRightMotor = 0;
-
-// void calculateRPM_position_Accel();
-
-float yawAS5600(float leftAngle, float rightAngle);
 
 const int EN = 32;
 const int DIR = 23;
@@ -43,10 +37,6 @@ hw_timer_t *timerRight = NULL;
 
 void IRAM_ATTR onTimerLeft();
 void IRAM_ATTR onTimerRight();
-void computeMembership(float theta, float &h1, float &h2, float &h3);
-void updateStates();
-float computeTScontrol();
-void applyMotorCommand(float u);
 
 float theta = 0.0, fusedThetaRate = 0.0;
 float pendulumPosition = 0.0, pendulumVelocity = 0.0;
@@ -81,9 +71,6 @@ void setup(){
 
     delay(1000);
     
-    // sensorRight.begin();
-    // sensorLeft.begin();
-
     // delay(2000);
 
     //------------------INICIALIZAÇÃO DOS MOTORES---------------//
@@ -228,13 +215,4 @@ void IRAM_ATTR onTimerRight() {
   stepperRight.runSpeed();
 }
 
-float yawAS5600(float leftAngle, float rightAngle)
-{
-  const float wheelRadius = 0.0325;
-  const float lenght = 0.210416;
-
-  float yawMagEncoder = (wheelRadius/lenght) * (rightAngle - leftAngle);
-
-  return yawMagEncoder;
-}
 
