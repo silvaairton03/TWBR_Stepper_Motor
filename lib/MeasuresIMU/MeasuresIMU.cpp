@@ -20,6 +20,7 @@ byte MeasuresIMU::beginWithLogging(int gyro_config_num, int acc_config_num, bool
     }
 
     return status;
+    delay(1000);
 }
 
 void MeasuresIMU::updateFilter(){

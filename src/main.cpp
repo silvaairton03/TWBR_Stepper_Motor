@@ -4,7 +4,7 @@
 #include<WiFi.h>
 #include<ESPAsyncWebServer.h>
 #include<AsyncTCP.h>
-#include "MPU6050_light.h"
+#include "MeasuresIMU.h"
 #include<AccelStepper.h>
 #include"stepper.h"
 #include"TS_Fuzzy.h"
@@ -16,9 +16,7 @@
 #define MAX_STEPS 8000
 #define MICROSTEP_DIVISOR 32
 
-// AS5600Sensor sensorRight(&Wire, AS5600_ADDRESS);    // This one uses the default Wire bus.
-// AS5600Sensor sensorLeft(&Wire1, AS5600_ADDRESS);
-MPU6050 mpu(Wire);
+MeasuresIMU imu(Wire);
 coupledController controller;
 TS_Fuzzy tsController;
 
@@ -31,20 +29,19 @@ const int STEP = 19;
 const int DIR_2 = 27;
 const int STEP_2 = 18;
 
-const float r = 0.0325;
-
-AccelStepper stepperLeft(1, STEP, DIR);
-AccelStepper stepperRight(1, STEP_2, DIR_2);
-stepper stepperStates(stepperLeft, stepperRight, r, STEPS_PER_REVOLUTION);
-
 hw_timer_t *timerLeft = NULL;
 hw_timer_t *timerRight = NULL;
 
 void IRAM_ATTR onTimerLeft();
 void IRAM_ATTR onTimerRight();
 
-float u = 0.0;
+float u = 0.0, controlSteps = 0.0;
 const float wheelRadius = 0.0325;
+float Fm = 0.0, M = 0.208;
+float a = 0.0;
+float vel = 0.0;
+
+stepper stepperStates(STEP, DIR, STEP_2, DIR_2, wheelRadius, STEPS_PER_REVOLUTION);
 
 //Ganhos para modelo do pêndulo sobre o carro
 float K1[4] = {-39.7073,   -3.4122,  -10.6711,   -7.6583};
@@ -59,24 +56,16 @@ float Kdelta[2] = {5.7480,  1.3461};
 // float k[4] = {-37.5724,  -3.8561,   -9.1731,   -6.8592}; //Ts = 0.02
 float Ts = 8;
 // float M = 0.104;
-float M = 0.208;
-
-const float stepAngle = 0.05625; // 1/32
-float n = 0.0;
 
 float Ttheta = 0.0, Tdelta = 0.0;
 float Tl = 0.0, Tr = 0.0;
-float theta = 0.0;
-float thetaRate = 0.0;
-float pendulumPosition = 0.0;
-float pendulumVelocity = 0.0;
-float delta = 0.0;
-float deltaRate = 0.0;
+float theta = 0.0, thetaRate = 0.0;
+float pendulumPosition = 0.0, pendulumVelocity = 0.0;
+float delta = 0.0,deltaRate  = 0.0;
 
 unsigned long currentMillis;
 unsigned long prevMillis = 0;
 float lastVel = 0;
-
 
 void setup(){
     pinMode(2, OUTPUT);
@@ -91,25 +80,10 @@ void setup(){
     controller.setDeltaGains(Kdelta);
 
     //------------------INICIALIZAÇÃO DOS MOTORES---------------//
-    pinMode(EN, OUTPUT);
-    pinMode(DIR, OUTPUT);
-    pinMode(STEP, OUTPUT);
-    pinMode(DIR_2, OUTPUT);
-    pinMode(STEP_2, OUTPUT);
-    digitalWrite(EN, LOW);
-
-    // //MOTOR 1
-    stepperLeft.setMaxSpeed(8000);
-    stepperLeft.setAcceleration(10000);
-    stepperLeft.setSpeed(0);
+    stepperStates.enableMotors(EN);
+    stepperStates.attachMPU(imu);
+    stepperStates.initMotors(10000, 8000);
     
-    // //MOTOR 2
-    stepperRight.setMaxSpeed(8000);
-    stepperRight.setAcceleration(10000);
-    stepperRight.setSpeed(0);
-
-    Serial.println("Motores iniciliazdos.");
-
     timerLeft = timerBegin(0, 80, true);    // Timer 0 for left motor
     timerAttachInterrupt(timerLeft, &onTimerLeft, true);
     timerAlarmWrite(timerLeft, 100, true);   // call every 100 µs (adjust as needed)
@@ -122,24 +96,16 @@ void setup(){
 
     Serial.println("Timer inicializado");
 
-    delay(1000);
     // //------------------------------------------------------------//
 
     //-----------------CONFIGURAÇÃO MPU6050-----------------------//
-    byte status = mpu.begin();
-    stepperStates.attachMPU(mpu);
-    Serial.print(F("MPU6050 status: "));
-    Serial.println(status);
-    while(status!=0){ } // stop everything if could not connect to MPU6050
-
-    Serial.println(F("Calculating offsets, do not move MPU6050"));
-    delay(1000);
-    //mpu.upsideDownMounting = true; // uncomment this line if the MPU6050 is mounted upside-down
-    mpu.calcOffsets(); // gyro and accelero
-    Serial.println("Done!\n");
+    byte status = imu.beginWithLogging(0, 0, true);
+    if (status != 0) {
+        Serial.println(F("MPU6050 initialization failed!"));
+        while (true); // trava o sistema caso a inicialização falhe
+    }
    //------------------------------------------------------------//
 
-    
     delay(2000);
 }
 
@@ -147,23 +113,16 @@ void loop(){
     currentMillis = millis();
     unsigned long timerdiff = currentMillis - prevMillis;
     
-    mpu.update();
     stepperStates.update();
 
-    theta = mpu.getAngleY() * 0.0174533;
-    thetaRate = mpu.getGyroY() * 0.0174533;
-
+    theta = imu.getIMUAngleY();
+    thetaRate = imu.getFusedRadSpeed();
     pendulumPosition = stepperStates.getRobotPosition();
     pendulumVelocity = stepperStates.getRobotVelocity();
     delta = stepperStates.getYawAngle();
     deltaRate = stepperStates.getYawRate();
 
     controller.updateStates(theta, thetaRate, pendulumPosition, pendulumVelocity, delta, deltaRate);
-
-    float Fm = 0.0;
-    float a = 0.0;
-    float vel = 0.0;
-    float controlSteps = 0.0;
     controller.computeTorques(Ttheta, Tdelta);
 
 
@@ -186,14 +145,12 @@ void loop(){
               controlSteps = (controlSteps > 0) ? MAX_STEPS : -MAX_STEPS;
           }
 
-          stepperLeft.setSpeed(controlSteps);
-          stepperRight.setSpeed(-controlSteps);
+          stepperStates.setMotorSpeed(controlSteps, -controlSteps);
 
           lastVel = vel;
 
         } else {
-            stepperLeft.setSpeed(0);
-            stepperRight.setSpeed(0);
+            stepperStates.setMotorSpeed(0,0);
             lastVel = 0; 
         }
       // //-------------------------------------------------------------//
@@ -210,9 +167,9 @@ void loop(){
 
 
 void IRAM_ATTR onTimerLeft() {
-  stepperLeft.runSpeed();
+  stepperStates.runMotors();
 }
 
 void IRAM_ATTR onTimerRight() {
-  stepperRight.runSpeed();
+  stepperStates.runMotors();
 }

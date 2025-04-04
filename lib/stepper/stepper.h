@@ -7,17 +7,24 @@
 
 class stepper {
 public:
-    stepper(AccelStepper &leftStepper, AccelStepper &rightStepper, float wheelRadius, int stepsPerRevolution);
+    stepper(uint8_t stepPinLeft, uint8_t dirPinLeft,
+        uint8_t stepPinRight, uint8_t dirPinRight,
+        float wheelRadius, int stepsPerRevolution);
+    void enableMotors(uint8_t enPin);
     void attachMPU(MPU6050 &mpuRef);
     void update();
+    void initMotors(float maxSpeed, float acceleration);
+    void setMotorSpeed(float leftSpeed, float rightSpeed);
+    void runMotors();
     float getRobotPosition() const;
     float getRobotVelocity() const;
     float getYawAngle() const;
     float getYawRate() const;
 
+
 private:
-    AccelStepper &stepperLeft;
-    AccelStepper &stepperRight;
+    AccelStepper* stepperLeft;
+    AccelStepper* stepperRight;
     MPU6050 *mpu;
     float wheelRadius;
     float wheelBase;
@@ -29,6 +36,9 @@ private:
     float lastYawOdom;
     const float VELOCITY_DEADBAND = 0.001;
     const float POSITION_DEADBAND = 0.005;
+
+    uint8_t stepPinLeft, dirPinLeft;
+    uint8_t stepPinRight, dirPinRight;
 };
 
 #endif
