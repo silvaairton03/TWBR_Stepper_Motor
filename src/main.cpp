@@ -1,6 +1,9 @@
 
 #include <Arduino.h>
 #include <Wire.h>
+#include<WiFi.h>
+#include<ESPAsyncWebServer.h>
+#include<AsyncTCP.h>
 #include "MPU6050_light.h"
 #include<AccelStepper.h>
 #include"stepper.h"
