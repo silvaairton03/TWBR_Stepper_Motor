@@ -14,8 +14,10 @@ public:
     void attachMPU(MPU6050 &mpuRef);
     void update();
     void initMotors(float maxSpeed, float acceleration);
+    void initTimers(void (*isrLeft)(), void (*isrRight)());
     void setMotorSpeed(float leftSpeed, float rightSpeed);
-    void runMotors();
+    void runLeftMotor();
+    void runRightMotor();
     float getRobotPosition() const;
     float getRobotVelocity() const;
     float getYawAngle() const;
@@ -39,6 +41,8 @@ private:
 
     uint8_t stepPinLeft, dirPinLeft;
     uint8_t stepPinRight, dirPinRight;
+    hw_timer_t *timerLeft;
+    hw_timer_t *timerRight;
 };
 
 #endif

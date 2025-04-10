@@ -8,7 +8,8 @@ stepper::stepper(uint8_t stepPinLeft, uint8_t dirPinLeft,
     yawAngle(0.0), yawRate(0.0), lastYawOdom(0.0),
     wheelBase(0.210416),
     stepPinLeft(stepPinLeft), dirPinLeft(dirPinLeft),
-    stepPinRight(stepPinRight), dirPinRight(dirPinRight)
+    stepPinRight(stepPinRight), dirPinRight(dirPinRight),
+    timerLeft(nullptr), timerRight(nullptr)
     {
         stepperLeft = new AccelStepper(1, stepPinLeft, dirPinLeft);
         stepperRight = new AccelStepper(1, stepPinRight, dirPinRight);
@@ -70,17 +71,36 @@ void stepper::initMotors(float maxSpeed, float acceleration)
     delay(1000);
 }
 
+void stepper::initTimers(void (*isrLeft)(), void (*isrRight)())
+{
+    timerLeft = timerBegin(0, 80, true);
+    timerAttachInterrupt(timerLeft, isrLeft, true);
+    timerAlarmWrite(timerLeft, 100, true);
+    timerAlarmEnable(timerLeft);
+
+    timerRight = timerBegin(1, 80, true);
+    timerAttachInterrupt(timerRight, isrRight, true);
+    timerAlarmWrite(timerRight, 100, true);
+    timerAlarmEnable(timerRight);
+
+    Serial.println("Timer inicializados");
+
+    delay(2000);
+}
+
 void stepper::setMotorSpeed(float leftSpeed, float rightSpeed)
 {
     stepperLeft->setSpeed(leftSpeed);
     stepperRight->setSpeed(rightSpeed);
 }
 
-void stepper::runMotors() {
+void stepper::runLeftMotor() {
     stepperLeft->runSpeed();
-    stepperRight->runSpeed();
 }
 
+void stepper::runRightMotor(){
+    stepperRight->runSpeed();
+}
 
 float stepper::getRobotPosition() const {
     return pendulumPosition;
