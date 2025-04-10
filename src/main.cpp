@@ -33,7 +33,6 @@ stepper stepperStates(STEP, DIR, STEP_2, DIR_2,
 void IRAM_ATTR onTimerLeft();
 void IRAM_ATTR onTimerRight();
 void controlTask(void *parameter);
-void commandTask(void *parameter);
 
 float controlSteps = 0.0;
 float Fm = 0.0, M = 0.208;
@@ -116,98 +115,10 @@ void setup(){
       &controlTaskHandle,    // handle
       1                      // core 1 (para isolar do WiFi/loop)
     );
-
-    // xTaskCreatePinnedToCore(
-    //   commandTask,
-    //   "CommandTask",
-    //   4096,
-    //   NULL,
-    //   1,
-    //   NULL,
-    //   0  // Roda no core 0, separado do controle
-    // );
-
-    
-
-    // xTaskCreatePinnedToCore(
-    //   [] (void *param) {
-    //     SensorData received;
-    //     while (true) {
-    //       if (xQueueReceive(dataQueue, &received, portMAX_DELAY)) {
-    //         Serial.print(received.theta*RAD_2_DEG, 4);
-    //         Serial.print(",");
-    //         Serial.println(received.thetaRate*RAD_2_DEG, 4);
-    //       }
-    //       vTaskDelay(pdMS_TO_TICKS(8)); // impressão a cada 20ms
-    //     }
-    //   },
-    //   "TransmitTask",
-    //   4096,
-    //   NULL,
-    //   1,    // prioridade menor que a de controle
-    //   NULL,
-    //   0     // Core 0
-    // );
 }
 
 void loop(){
-  // static unsigned long lastPrint = 0;
-  // if (millis() - lastPrint >= 20){
-  //   Serial.print(thetaDeg);
-  //   Serial.print(",");
-  //   Serial.println(thetaRateDeg);
-  // }
-  // unsigned long timerdiff = currentMillis - prevMillis;
   
-  // imu.update();
-  // imu.updateFilter();
-  // stepperStates.update();
-
-  // theta = imu.getIMUAngleY();
-  // thetaRate = imu.getFusedRadSpeed();
-  // pendulumPosition = stepperStates.getRobotPosition();
-  // pendulumVelocity = stepperStates.getRobotVelocity();
-  // delta = stepperStates.getYawAngle();
-  // deltaRate = stepperStates.getYawRate();
-
-  // controller.updateStates(theta, thetaRate, pendulumPosition, pendulumVelocity, delta, deltaRate);
-  // controller.computeTorques(Ttheta, Tdelta);
-
-
-  // if (timerdiff >= Ts){
-  //   // //-------------------CONTROLADOR LQR---------------------------//
-  //   if (fabs(theta) < SAFE_ANGLE){
-  //       // u = tsController.computeControl(theta, thetaRate, pendulumPosition, pendulumVelocity);
-
-  //       float Tl = 0.5 * Ttheta + 0.5 * Tdelta;
-  //       float Tr = 0.5 * Ttheta - 0.5 * Tdelta;
-
-  //       Fm = (Tl+Tr)/2;
-  //       a = Fm / M;
-  //       vel = lastVel + a * (Ts / 1000.0);
-
-  //       controlSteps = (vel * STEPS_PER_REVOLUTION) / (2* PI * wheelRadius);
-
-
-  //       if (fabs(controlSteps) > MAX_STEPS) {
-  //           controlSteps = (controlSteps > 0) ? MAX_STEPS : -MAX_STEPS;
-  //       }
-
-  //       stepperStates.setMotorSpeed(controlSteps, -controlSteps);
-
-  //       lastVel = vel;
-
-  //     } else {
-  //         stepperStates.setMotorSpeed(0,0);
-  //         lastVel = 0; 
-  //     }
-  //   // //-------------------------------------------------------------//
-  //   prevMillis = currentMillis;
-  // }
-
-  // Serial.print(theta * 57.2958); Serial.print(",");
-  // Serial.print(thetaRate * 57.2958); Serial.print(",");
-  // Serial.println(Ttheta);
 }
 
 
@@ -266,24 +177,5 @@ void controlTask(void *parameter) {
   }
 }
 
-// void commandTask(void *parameter) {
-//   while (true) {
-//     if (Serial.available()) {
-//       String input = Serial.readStringUntil('\n');
-//       input.trim();
-
-//       if (input.startsWith("ref=")) {
-//         String valueStr = input.substring(4);
-//         float value = valueStr.toFloat();
-//         refPosition = value / 100.0f;  // cm -> m
-
-//         Serial.print("Nova referência de posição: ");
-//         Serial.print(refPosition);
-//         Serial.println(" m");
-//       }
-//     }
-//     vTaskDelay(pdMS_TO_TICKS(10)); // pequena espera para não travar o sistema
-//   }
-// }
 
 
