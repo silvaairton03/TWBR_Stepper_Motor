@@ -12,7 +12,7 @@
 
 // #define AS5600_ADDRESS 0x36
 #define SAFE_ANGLE 0.8 //rad
-#define MAX_STEPS 8000
+#define MAX_STEPS 9000
 #define MICROSTEP_DIVISOR 32
 #define STEPS_PER_REVOLUTION 6400
 float wheelRadius = 0.0325;
@@ -45,7 +45,9 @@ float K1[4] = {-39.7073,   -3.4122,  -10.6711,   -7.6583};
 float K2[4] = { -49.6606,   -4.8163,  -14.4073,  -10.3396}; //30 graus
 float K3[4] = { -49.6606,   -4.8163,  -14.4073,  -10.3396}; //-30 graus
 float K4[4] = {-71.0149,   -6.2501,  -11.4300,   -8.2029}; //45 graus
-float K5[4] = {-71.0149,   -6.2501,  -11.4300,   -8.2029};//-45 gruas
+float K5[4] = {-71.0149,   -6.2501,  -11.4300,   -8.2029};//-45 graus
+float K6[4] = { -104.8055,  -10.5896,  -16.6980,  -11.9836};
+float K7[4] = { -104.8055,  -10.5896,  -16.6980,  -11.9836};
 
 float Kdelta[2] = {5.7480,  1.3461};
 float Ts = 8;
@@ -54,7 +56,7 @@ float Ttheta = 0.0, Tdelta = 0.0;
 float Tl = 0.0, Tr = 0.0;
 float theta = 0.0, thetaRate = 0.0;
 float pendulumPosition = 0.0, pendulumVelocity = 0.0;
-float refPosition = 5.0, errorPosition = 0.0;
+float refPosition = 0.0, errorPosition = 0.0;
 float delta = 0.0,deltaRate  = 0.0;
 volatile float thetaDeg = 0.0;
 volatile float thetaRateDeg = 0.0;
@@ -66,7 +68,7 @@ float lastVel = 0;
 
 typedef struct {
   float theta;
-  float thetaRate;
+  float pendulumPosition;
 } SensorData;
 
 TaskHandle_t controlTaskHandle = NULL;
@@ -87,13 +89,14 @@ void setup(){
     }
 
     // Controlador
-    controller.setFuzzyGains(K1, K2, K3, K4, K5);
-    controller.setDeltaGains(Kdelta);
+    // controller.setFuzzyGains(K1, K2, K3, K4, K5);
+    // controller.setDeltaGains(Kdelta);
+    tsController.set7Gains(K1, K2, K3, K4, K5, K6, K7);
 
     //------------------INICIALIZAÇÃO DOS MOTORES---------------//
     stepperStates.enableMotors(EN);
     stepperStates.attachMPU(imu);
-    stepperStates.initMotors(10000, 8000);
+    stepperStates.initMotors(MAX_STEPS, 8000);
     stepperStates.initTimers(onTimerLeft, onTimerRight);
     //------------------------------------------------------------//
 
@@ -129,85 +132,29 @@ void setup(){
 
     
 
-    // xTaskCreatePinnedToCore(
-    //   [] (void *param) {
-    //     SensorData received;
-    //     while (true) {
-    //       if (xQueueReceive(dataQueue, &received, portMAX_DELAY)) {
-    //         Serial.print(received.theta*RAD_2_DEG, 4);
-    //         Serial.print(",");
-    //         Serial.println(received.thetaRate*RAD_2_DEG, 4);
-    //       }
-    //       vTaskDelay(pdMS_TO_TICKS(8)); // impressão a cada 20ms
-    //     }
-    //   },
-    //   "TransmitTask",
-    //   4096,
-    //   NULL,
-    //   1,    // prioridade menor que a de controle
-    //   NULL,
-    //   0     // Core 0
-    // );
+    xTaskCreatePinnedToCore(
+      [] (void *param) {
+        SensorData received;
+        while (true) {
+          if (xQueueReceive(dataQueue, &received, portMAX_DELAY)) {
+            Serial.print(theta*RAD_2_DEG);
+            Serial.print(",");
+            Serial.println(pendulumPosition*100);
+          }
+          vTaskDelay(pdMS_TO_TICKS(8)); // impressão a cada 20ms
+        }
+      },
+      "TransmitTask",
+      4096,
+      NULL,
+      1,    // prioridade menor que a de controle
+      NULL,
+      0     // Core 0
+    );
 }
 
 void loop(){
-  // static unsigned long lastPrint = 0;
-  // if (millis() - lastPrint >= 20){
-  //   Serial.print(thetaDeg);
-  //   Serial.print(",");
-  //   Serial.println(thetaRateDeg);
-  // }
-  // unsigned long timerdiff = currentMillis - prevMillis;
   
-  // imu.update();
-  // imu.updateFilter();
-  // stepperStates.update();
-
-  // theta = imu.getIMUAngleY();
-  // thetaRate = imu.getFusedRadSpeed();
-  // pendulumPosition = stepperStates.getRobotPosition();
-  // pendulumVelocity = stepperStates.getRobotVelocity();
-  // delta = stepperStates.getYawAngle();
-  // deltaRate = stepperStates.getYawRate();
-
-  // controller.updateStates(theta, thetaRate, pendulumPosition, pendulumVelocity, delta, deltaRate);
-  // controller.computeTorques(Ttheta, Tdelta);
-
-
-  // if (timerdiff >= Ts){
-  //   // //-------------------CONTROLADOR LQR---------------------------//
-  //   if (fabs(theta) < SAFE_ANGLE){
-  //       // u = tsController.computeControl(theta, thetaRate, pendulumPosition, pendulumVelocity);
-
-  //       float Tl = 0.5 * Ttheta + 0.5 * Tdelta;
-  //       float Tr = 0.5 * Ttheta - 0.5 * Tdelta;
-
-  //       Fm = (Tl+Tr)/2;
-  //       a = Fm / M;
-  //       vel = lastVel + a * (Ts / 1000.0);
-
-  //       controlSteps = (vel * STEPS_PER_REVOLUTION) / (2* PI * wheelRadius);
-
-
-  //       if (fabs(controlSteps) > MAX_STEPS) {
-  //           controlSteps = (controlSteps > 0) ? MAX_STEPS : -MAX_STEPS;
-  //       }
-
-  //       stepperStates.setMotorSpeed(controlSteps, -controlSteps);
-
-  //       lastVel = vel;
-
-  //     } else {
-  //         stepperStates.setMotorSpeed(0,0);
-  //         lastVel = 0; 
-  //     }
-  //   // //-------------------------------------------------------------//
-  //   prevMillis = currentMillis;
-  // }
-
-  // Serial.print(theta * 57.2958); Serial.print(",");
-  // Serial.print(thetaRate * 57.2958); Serial.print(",");
-  // Serial.println(Ttheta);
 }
 
 
@@ -231,21 +178,23 @@ void controlTask(void *parameter) {
     theta = imu.getIMUAngleY();
     thetaRate = imu.getFusedRadSpeed();
     pendulumPosition = stepperStates.getRobotPosition();
-    errorPosition = (refPosition/100.0f) - pendulumPosition;
+    errorPosition = pendulumPosition - refPosition;
     pendulumVelocity = stepperStates.getRobotVelocity();
     delta = stepperStates.getYawAngle();
     deltaRate = stepperStates.getYawRate();
 
-    controller.updateStates(theta, thetaRate, pendulumPosition, pendulumVelocity, delta, deltaRate);
-    controller.computeTorques(Ttheta, Tdelta);
+    // controller.updateStates(theta, thetaRate, errorPosition, pendulumVelocity, delta, deltaRate);
+    // controller.computeTorques(Ttheta, Tdelta);
 
     if (fabs(theta) < SAFE_ANGLE){
-        float Tl = 0.5 * Ttheta + 0.5 * Tdelta;
-        float Tr = 0.5 * Ttheta - 0.5 * Tdelta;
+        // float Tl = 0.5 * Ttheta + 0.5 * Tdelta;
+        // float Tr = 0.5 * Ttheta - 0.5 * Tdelta;
+        Ttheta = tsController.computeControl7mf(theta, thetaRate, errorPosition, pendulumVelocity);
 
-        float Fm = (Tl+Tr)/2;
+        // float Fm = (Tl+Tr)/2;
+        float Fm = Ttheta/2;
         float a = Fm / M;
-        vel = lastVel + a * (8.0 / 1000.0); // Ts = 8ms
+        vel = lastVel + a * (Ts / 1000.0); // Ts = 8ms
 
         controlSteps = (vel * STEPS_PER_REVOLUTION) / (2 * PI * wheelRadius);
 
@@ -259,8 +208,8 @@ void controlTask(void *parameter) {
         vel = 0;
     }
 
-    // SensorData data = {theta, thetaRate};
-    // xQueueSend(dataQueue, &data, 0);
+    SensorData data = {theta, pendulumPosition};
+    xQueueSend(dataQueue, &data, 0);
 
     vTaskDelayUntil(&xLastWakeTime, xFrequency);
   }

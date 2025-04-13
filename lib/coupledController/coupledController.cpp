@@ -7,7 +7,7 @@ coupledController::coupledController(){
 }
 
 void coupledController::setFuzzyGains(const float K1[4], const float K2[4], const float K3[4], const float K4[4], const float K5[4]){
-    fuzzyController.setGains(K1, K2, K3, K4, K5);    
+    fuzzyController.set5Gains(K1, K2, K3, K4, K5);    
 }
 
 void coupledController::setDeltaGains(const float Kd[2]){
@@ -26,7 +26,7 @@ void coupledController::updateStates(float theta, float thetaRate, float pos, fl
 }
 
 void coupledController::computeTorques(float &Ttheta, float &Tdelta){
-    Ttheta = fuzzyController.computeControl(stateTheta[0], stateTheta[1], stateTheta[2], stateTheta[3]);
+    Ttheta = fuzzyController.computeControl5mf(stateTheta[0], stateTheta[1], stateTheta[2], stateTheta[3]);
 
     Tdelta = 0.0f;
     for (int i = 0; i < 2; ++i)
