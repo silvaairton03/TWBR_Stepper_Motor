@@ -1,10 +1,15 @@
 
 #include <Arduino.h>
 #include <Wire.h>
+#include <WiFi.h>
 #include <AccelStepper.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/queue.h>
+#include <AsyncTCP.h>
+#include <ESPAsyncWebServer.h>
+#include <SPIFFS.h>
 
+#include "webSocketServer.h"
 #include "MeasuresIMU.h"
 #include "stepper.h"
 #include "TS_Fuzzy.h"
@@ -30,10 +35,14 @@ TS_Fuzzy tsController;
 stepper stepperStates(STEP, DIR, STEP_2, DIR_2,
   wheelRadius, stepsPerRev);
 
+AsyncWebServer server(80);
+
 void IRAM_ATTR onTimerLeft();
 void IRAM_ATTR onTimerRight();
 void controlTask(void *parameter);
-void commandTask(void *parameter);
+void onWebSocketEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
+  AwsEventType type, void *arg, uint8_t *data, size_t len);
+
 
 float controlSteps = 0.0;
 float Fm = 0.0, M = 0.208;
@@ -49,15 +58,13 @@ float K5[4] = {-71.0149,   -6.2501,  -11.4300,   -8.2029};//-45 graus
 float K6[4] = { -104.8055,  -10.5896,  -16.6980,  -11.9836};
 float K7[4] = { -104.8055,  -10.5896,  -16.6980,  -11.9836};
 
-float Kdelta[2] = {5.7480,  1.3461};
 float Ts = 8;
 
-float Ttheta = 0.0, Tdelta = 0.0;
-float Tl = 0.0, Tr = 0.0;
+float Ttheta = 0.0;
 float theta = 0.0, thetaRate = 0.0;
 float pendulumPosition = 0.0, pendulumVelocity = 0.0;
-float refPosition = 0.0, errorPosition = 0.0;
-float delta = 0.0,deltaRate  = 0.0;
+volatile float refPosition = 0.0f;
+float errorPosition = 0.0;
 volatile float thetaDeg = 0.0;
 volatile float thetaRateDeg = 0.0;
 
@@ -65,32 +72,50 @@ unsigned long currentMillis;
 static unsigned long prevMillis = 0;
 
 float lastVel = 0;
-
-typedef struct {
-  float theta;
-  float pendulumPosition;
-} SensorData;
+// typedef struct {
+//   float theta;
+//   float pendulumPosition;
+// } SensorData;
 
 TaskHandle_t controlTaskHandle = NULL;
-QueueHandle_t dataQueue;
+// QueueHandle_t dataQueue;
+
+const char* ssid = "Kenayvision2";
+const char* password = "L59S70A95a97";
 
 void setup(){
     pinMode(2, OUTPUT);
     Serial.begin(115200);
-
     Wire.begin(21,22,800000L);
 
     delay(1000);
 
-    dataQueue = xQueueCreate(100, sizeof(SensorData));
-    if (dataQueue == NULL) {
-      Serial.println("Erro ao criar a fila!");
-      while (true);  // trava o sistema se falhar
+    WiFi.begin(ssid, password);
+    Serial.print("Connecting to Wi-Fi");
+    while (WiFi.status() != WL_CONNECTED) {
+      delay(500);
+      Serial.print(".");
+    }
+    Serial.println("\n[WiFi] Connected!");
+    Serial.print("[WiFi] IP Address: ");
+    Serial.println(WiFi.localIP());
+
+    if (!SPIFFS.begin(true)) {
+      Serial.println("SPIFFS mount failed");
+      return;
     }
 
-    // Controlador
-    // controller.setFuzzyGains(K1, K2, K3, K4, K5);
-    // controller.setDeltaGains(Kdelta);
+    // Serve static files
+    server.serveStatic("/", SPIFFS, "/").setDefaultFile("index.html");
+    initWebSocket(server);
+    server.begin();
+
+    // dataQueue = xQueueCreate(100, sizeof(SensorData));
+    // if (dataQueue == NULL) {
+    //   Serial.println("Erro ao criar a fila!");
+    //   while (true);  // trava o sistema se falhar
+    // }
+
     tsController.set7Gains(K1, K2, K3, K4, K5, K6, K7);
 
     //------------------INICIALIZAÇÃO DOS MOTORES---------------//
@@ -108,7 +133,7 @@ void setup(){
     }
    //------------------------------------------------------------//
 
-    delay(2000);
+    delay(1000);
 
     xTaskCreatePinnedToCore(
       controlTask,           // função da task
@@ -121,40 +146,27 @@ void setup(){
     );
 
     // xTaskCreatePinnedToCore(
-    //   commandTask,
-    //   "CommandTask",
+    //   [] (void *param) {
+    //     SensorData received;
+    //     while (true) {
+    //       if (xQueueReceive(dataQueue, &received, portMAX_DELAY)) {
+    //         Serial.print(theta*RAD_2_DEG);
+    //         Serial.print(",");
+    //         Serial.println(pendulumPosition*100);
+    //       }
+    //       vTaskDelay(pdMS_TO_TICKS(8)); // impressão a cada 20ms
+    //     }
+    //   },
+    //   "TransmitTask",
     //   4096,
     //   NULL,
-    //   1,
+    //   1,    // prioridade menor que a de controle
     //   NULL,
-    //   0  // Roda no core 0, separado do controle
+    //   0     // Core 0
     // );
-
-    
-
-    xTaskCreatePinnedToCore(
-      [] (void *param) {
-        SensorData received;
-        while (true) {
-          if (xQueueReceive(dataQueue, &received, portMAX_DELAY)) {
-            Serial.print(theta*RAD_2_DEG);
-            Serial.print(",");
-            Serial.println(pendulumPosition*100);
-          }
-          vTaskDelay(pdMS_TO_TICKS(8)); // impressão a cada 20ms
-        }
-      },
-      "TransmitTask",
-      4096,
-      NULL,
-      1,    // prioridade menor que a de controle
-      NULL,
-      0     // Core 0
-    );
 }
 
 void loop(){
-  
 }
 
 
@@ -171,6 +183,7 @@ void controlTask(void *parameter) {
   const TickType_t xFrequency = pdMS_TO_TICKS(8); // 8ms
 
   while (true) {
+
     imu.update();
     imu.updateFilter();
     stepperStates.update();
@@ -178,20 +191,27 @@ void controlTask(void *parameter) {
     theta = imu.getIMUAngleY();
     thetaRate = imu.getFusedRadSpeed();
     pendulumPosition = stepperStates.getRobotPosition();
-    errorPosition = pendulumPosition - refPosition;
     pendulumVelocity = stepperStates.getRobotVelocity();
-    delta = stepperStates.getYawAngle();
-    deltaRate = stepperStates.getYawRate();
+    errorPosition = pendulumPosition - refPosition;
 
-    // controller.updateStates(theta, thetaRate, errorPosition, pendulumVelocity, delta, deltaRate);
-    // controller.computeTorques(Ttheta, Tdelta);
+    if (pendingCommand != NONE) {
+      if (pendingCommand == FORWARD) {
+        refPosition += 0.05f;
+      } else if (pendingCommand == BACKWARD) {
+        refPosition -= 0.05f;
+      }
+    
+      refPosition = constrain(refPosition, -0.3f, 0.3f);
+      pendingCommand = NONE;  // Reset flag
+    }
 
-    if (fabs(theta) < SAFE_ANGLE){
-        // float Tl = 0.5 * Ttheta + 0.5 * Tdelta;
-        // float Tr = 0.5 * Ttheta - 0.5 * Tdelta;
+    if (fabs(errorPosition) < 0.005f) {
+      errorPosition = 0.0f;
+    }
+
+    if (fabs(theta) < SAFE_ANGLE){;
         Ttheta = tsController.computeControl7mf(theta, thetaRate, errorPosition, pendulumVelocity);
 
-        // float Fm = (Tl+Tr)/2;
         float Fm = Ttheta/2;
         float a = Fm / M;
         vel = lastVel + a * (Ts / 1000.0); // Ts = 8ms
@@ -208,31 +228,10 @@ void controlTask(void *parameter) {
         vel = 0;
     }
 
-    SensorData data = {theta, pendulumPosition};
-    xQueueSend(dataQueue, &data, 0);
+    // SensorData data = {theta, pendulumPosition};
+    // xQueueSend(dataQueue, &data, 0);
 
     vTaskDelayUntil(&xLastWakeTime, xFrequency);
   }
 }
-
-// void commandTask(void *parameter) {
-//   while (true) {
-//     if (Serial.available()) {
-//       String input = Serial.readStringUntil('\n');
-//       input.trim();
-
-//       if (input.startsWith("ref=")) {
-//         String valueStr = input.substring(4);
-//         float value = valueStr.toFloat();
-//         refPosition = value / 100.0f;  // cm -> m
-
-//         Serial.print("Nova referência de posição: ");
-//         Serial.print(refPosition);
-//         Serial.println(" m");
-//       }
-//     }
-//     vTaskDelay(pdMS_TO_TICKS(10)); // pequena espera para não travar o sistema
-//   }
-// }
-
 
