@@ -57,4 +57,3 @@ float MeasuresIMU::getFusedRadSpeed()
 
     return fusedRate * DEG_TO_RAD;
 }
-
