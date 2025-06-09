@@ -1,20 +1,16 @@
 
 #include <Arduino.h>
 #include <Wire.h>
-#include <WiFi.h>
 #include <AccelStepper.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/queue.h>
-#include <AsyncTCP.h>
-#include <ESPAsyncWebServer.h>
-#include <SPIFFS.h>
 #include "MeasuresIMU.h"
 #include "stepper.h"
 #include "TS_Fuzzy.h"
 
 // #define AS5600_ADDRESS 0x36
 #define SAFE_ANGLE 0.5 //rad
-#define MAX_STEPS 7000
+#define MAX_STEPS 8000
 #define MICROSTEP_DIVISOR 32
 #define STEPS_PER_REVOLUTION 6400
 float wheelRadius = 0.0325;
@@ -31,8 +27,6 @@ TS_Fuzzy tsController;
 stepper stepperStates(STEP, DIR, STEP_2, DIR_2,
   wheelRadius, stepsPerRev);
 
-AsyncWebServer server(80);
-
 void IRAM_ATTR onTimerLeft();
 void IRAM_ATTR onTimerRight();
 void controlTask(void *parameter);
@@ -40,7 +34,7 @@ void controlTask(void *parameter);
 float computeLQRControl(float theta, float thetaRate, float position, float velocity);
 
 float controlSteps = 0.0;
-float Fm = 0.0, M = 0.202;
+float Fm = 0.0, M = 0.208;
 float a = 0.0;
 float vel = 0.0;
 
@@ -70,10 +64,10 @@ float lastVel = 0;
 typedef struct {
   float theta;
   float thetaRate;
-  float pendulumPosition;
-  float pendulumVelocity;
-  float Ttheta;
-  float controlSteps;
+  // float pendulumPosition;
+  // float pendulumVelocity;
+  // float Ttheta;
+  // float controlSteps;
   // float h1, h2, h3;
   // float refPosition;
 } SensorData;
@@ -134,20 +128,10 @@ void setup(){
         SensorData received;
         while (true) {
           if (xQueueReceive(dataQueue, &received, portMAX_DELAY)) {
-            // Serial.printf("theta=%.2f°, h1=%.2f, h2=%.2f, h3=%.2f\n",
-            //               received.theta * RAD_TO_DEG);
-                          // received.h1, received.h2, received.h3);
             
-            // CSV-style output
             Serial.print(received.theta * RAD_TO_DEG); Serial.print(",");
-            Serial.print(received.thetaRate * RAD_2_DEG); Serial.print(",");
-            // Serial.print(received.pendulumPosition * 100); Serial.print(",");
-            // Serial.print(received.controlSteps); Serial.print(",");
-            Serial.println(received.Ttheta);
+            Serial.println(received.thetaRate * RAD_2_DEG); 
           }
-
-          // Optional: monitor stack usage
-          // Serial.printf("Stack: %d bytes\n", uxTaskGetStackHighWaterMark(NULL));
 
           vTaskDelay(pdMS_TO_TICKS(8));
         }
@@ -178,7 +162,7 @@ void controlTask(void *parameter) {
   TickType_t xLastWakeTime = xTaskGetTickCount();
   const TickType_t xFrequency = pdMS_TO_TICKS(8); // 8ms
   // const float dt = pdTICKS_TO_MS(xFrequency) / 1000.0f;
-  const float DEADZONE_GYRO = 0.01;
+  // const float DEADZONE_GYRO = 0.01;
 
   while (true) {
 
@@ -188,9 +172,9 @@ void controlTask(void *parameter) {
 
     theta = imu.getIMUAngleY();
     thetaRate = imu.getFusedRadSpeed();
-    if (fabs(thetaRate) < DEADZONE_GYRO) {
-      thetaRate = 0.0;
-    }
+    // if (fabs(thetaRate) < DEADZONE_GYRO) {
+    //   thetaRate = 0.0;
+    // }
     pendulumPosition = stepperStates.getRobotPosition();
     pendulumVelocity = stepperStates.getRobotVelocity();
 
@@ -218,12 +202,6 @@ void controlTask(void *parameter) {
     SensorData data = {};
     data.theta = theta;
     data.thetaRate = thetaRate;
-    // data.pendulumPosition = pendulumPosition;
-    data.Ttheta = Ttheta;
-    // data.controlSteps = controlSteps;
-    // data.h1 = h1;
-    // data.h2 = h2;
-    // data.h3 = h3;
     if (xQueueSend(dataQueue, &data, 0) != pdPASS) {
       Serial.println("Queue full! Dropping data.");
     }
