@@ -43,7 +43,7 @@ float MeasuresIMU::getFusedRadSpeed()
     if (dt < EPSILON) dt = EPSILON; 
 
 
-    float currentAngle = this->getAccAngleY();
+    float currentAngle = this->getAngleY();
     float gyroYraw = this->getGyroY();
 
     float radSpeedEstimate = (currentAngle - prevFilteredAngle)/dt;

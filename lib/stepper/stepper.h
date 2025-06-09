@@ -16,12 +16,11 @@ public:
     void initMotors(float maxSpeed, float acceleration);
     void initTimers(void (*isrLeft)(), void (*isrRight)());
     void setMotorSpeed(float leftSpeed, float rightSpeed);
+    void resetSteps();
     void runLeftMotor();
     void runRightMotor();
     float getRobotPosition() const;
     float getRobotVelocity() const;
-    float getYawAngle() const;
-    float getYawRate() const;
 
 
 private:
@@ -33,11 +32,8 @@ private:
     int stepsPerRevolution;
     float pendulumPosition;
     float pendulumVelocity;
-    float yawAngle;
-    float yawRate;
-    float lastYawOdom;
-    const float VELOCITY_DEADBAND = 0.001;
-    const float POSITION_DEADBAND = 0.005;
+    const float POSITION_DEADBAND = 1e-4;
+    const float VELOCITY_DEADBAND = 1e-4;   
 
     uint8_t stepPinLeft, dirPinLeft;
     uint8_t stepPinRight, dirPinRight;

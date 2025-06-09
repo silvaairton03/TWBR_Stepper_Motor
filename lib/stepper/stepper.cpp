@@ -5,8 +5,6 @@ stepper::stepper(uint8_t stepPinLeft, uint8_t dirPinLeft,
                 float wheelRadius, int stepsPerRevolution)
     :wheelRadius(wheelRadius), stepsPerRevolution(stepsPerRevolution),
     pendulumPosition(0.0), pendulumVelocity(0.0),
-    yawAngle(0.0), yawRate(0.0), lastYawOdom(0.0),
-    wheelBase(0.210416),
     stepPinLeft(stepPinLeft), dirPinLeft(dirPinLeft),
     stepPinRight(stepPinRight), dirPinRight(dirPinRight),
     timerLeft(nullptr), timerRight(nullptr)
@@ -43,18 +41,6 @@ void stepper::update() {
     // pendulumPosition = (fabs(rawPendulumPosition) < POSITION_DEADBAND) ? 0 : rawPendulumPosition;
     pendulumPosition = rawPendulumPosition;
     pendulumVelocity = rawPendulumVelocity;
-
-    float yawOdom = (wheelRadius / wheelBase) * (stepperPositionRight - stepperPositionLeft);
-    float yawRateOdom = (wheelRadius / wheelBase) * (stepperMotorRadRight - stepperMotorRadLeft);
-
-    float yawIMU = mpu->getAngleZ() * DEG_TO_RAD;     // Converte de graus para radianos
-    float yawRateIMU = mpu->getGyroZ() * DEG_TO_RAD;
-
-    const float alpha = 0.98;
-    yawAngle = alpha * yawOdom + (1.0 - alpha) * yawIMU;
-    yawRate = alpha * yawRateOdom + (1.0 - alpha) * yawRateIMU;
-
-    lastYawOdom = yawOdom;
 }
 
 void stepper::initMotors(float maxSpeed, float acceleration)
@@ -94,6 +80,14 @@ void stepper::setMotorSpeed(float leftSpeed, float rightSpeed)
     stepperRight->setSpeed(rightSpeed);
 }
 
+void stepper::resetSteps()
+{
+    stepperLeft->setCurrentPosition(0);
+    stepperRight->setCurrentPosition(0);
+    pendulumPosition = 0.0f;
+    pendulumVelocity = 0.0f;
+}
+
 void stepper::runLeftMotor() {
     stepperLeft->runSpeed();
 }
@@ -108,12 +102,4 @@ float stepper::getRobotPosition() const {
 
 float stepper::getRobotVelocity() const {
     return pendulumVelocity;
-}
-
-float stepper::getYawAngle() const {
-    return yawAngle;
-}
-
-float stepper::getYawRate() const {
-    return yawRate;
 }

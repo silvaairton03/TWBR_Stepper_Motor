@@ -8,15 +8,13 @@
 #include <AsyncTCP.h>
 #include <ESPAsyncWebServer.h>
 #include <SPIFFS.h>
-
-#include "webSocketServer.h"
 #include "MeasuresIMU.h"
 #include "stepper.h"
 #include "TS_Fuzzy.h"
 
 // #define AS5600_ADDRESS 0x36
-#define SAFE_ANGLE 0.8 //rad
-#define MAX_STEPS 10000
+#define SAFE_ANGLE 0.5 //rad
+#define MAX_STEPS 7000
 #define MICROSTEP_DIVISOR 32
 #define STEPS_PER_REVOLUTION 6400
 float wheelRadius = 0.0325;
@@ -47,13 +45,9 @@ float a = 0.0;
 float vel = 0.0;
 
 //Ganhos para modelo do pêndulo sobre o carro
-float K1[4] = {-49.9657,   -4.7947,  -16.3911,  -11.3871};//-5 graus
-float K2[4] = {-39.7073,   -3.4122,  -10.6711,   -7.6583};
-// float K2[4] = { -49.6606,   -4.8163,  -14.4073,  -10.3396}; //30 graus
-// float K3[4] = { -49.6606,   -4.8163,  -14.4073,  -10.3396}; //-30 graus
-// float K4[4] = {-71.0149,   -6.2501,  -11.4300,   -8.2029}; //45 graus
-// float K5[4] = {-71.0149,   -6.2501,  -11.4300,   -8.2029};//-45 graus
-float K3[4] = {-49.9657,   -4.7947,  -16.3911,  -11.3871};//-2 graus
+// float K1[4] = {-49.9657,   -4.7947,  -16.3911,  -11.3871};//-5 graus
+// float K2[4] = {-39.7073,   -3.4122,  -10.6711,   -7.6583};
+// float K3[4] = {-49.9657,   -4.7947,  -16.3911,  -11.3871};//-2 graus
 
 float Ts = 8;
 
@@ -75,7 +69,9 @@ float lastVel = 0;
 
 typedef struct {
   float theta;
+  float thetaRate;
   float pendulumPosition;
+  float pendulumVelocity;
   float Ttheta;
   float controlSteps;
   // float h1, h2, h3;
@@ -106,8 +102,8 @@ void setup(){
 
     //------------------INICIALIZAÇÃO DOS MOTORES---------------//
     stepperStates.enableMotors(EN);
-    stepperStates.attachMPU(imu);
-    stepperStates.initMotors(MAX_STEPS, 8000);
+    stepperStates.resetSteps();
+    stepperStates.initMotors(MAX_STEPS, 6000);
     stepperStates.initTimers(onTimerLeft, onTimerRight);
     //------------------------------------------------------------//
 
@@ -141,11 +137,12 @@ void setup(){
             // Serial.printf("theta=%.2f°, h1=%.2f, h2=%.2f, h3=%.2f\n",
             //               received.theta * RAD_TO_DEG);
                           // received.h1, received.h2, received.h3);
-
+            
             // CSV-style output
             Serial.print(received.theta * RAD_TO_DEG); Serial.print(",");
-            Serial.print(received.pendulumPosition * 100); Serial.print(",");
-            Serial.print(received.controlSteps); Serial.print(",");
+            Serial.print(received.thetaRate * RAD_2_DEG); Serial.print(",");
+            // Serial.print(received.pendulumPosition * 100); Serial.print(",");
+            // Serial.print(received.controlSteps); Serial.print(",");
             Serial.println(received.Ttheta);
           }
 
@@ -180,7 +177,8 @@ void IRAM_ATTR onTimerRight() {
 void controlTask(void *parameter) {
   TickType_t xLastWakeTime = xTaskGetTickCount();
   const TickType_t xFrequency = pdMS_TO_TICKS(8); // 8ms
-  const float dt = pdTICKS_TO_MS(xFrequency) / 1000.0f;
+  // const float dt = pdTICKS_TO_MS(xFrequency) / 1000.0f;
+  const float DEADZONE_GYRO = 0.01;
 
   while (true) {
 
@@ -189,33 +187,18 @@ void controlTask(void *parameter) {
     stepperStates.update();
 
     theta = imu.getIMUAngleY();
-    thetaRate = imu.getIMUGyroY();
+    thetaRate = imu.getFusedRadSpeed();
+    if (fabs(thetaRate) < DEADZONE_GYRO) {
+      thetaRate = 0.0;
+    }
     pendulumPosition = stepperStates.getRobotPosition();
     pendulumVelocity = stepperStates.getRobotVelocity();
-
-    // float h1, h2, h3;
-    // tsController.compute3Memberships(theta, h1, h2, h3);
-    // Serial.printf("theta=%.2f°, h1=%.2f, h2=%.2f, h3=%.2f\n", theta * RAD_TO_DEG, h1, h2, h3);
-
-    // if (!referenceEnabled && millis() - referenceStartTime > 5000) {
-    //     referenceEnabled = true;
-    // }
-
-    // if (referenceEnabled) {
-    //     refPosition = 0.1f;  // Example step to 10 cm
-    //     // Or use sinusoidal:
-    //     // float t = (millis() - referenceStartTime) / 1000.0;
-    //     // refPosition = 0.05f * sin(2 * PI * 0.1 * t);
-    // } else {
-    //     refPosition = 0.0f;
-    // }
-    // errorPosition = pendulumPosition - refPosition;
 
     if (fabs(theta) < SAFE_ANGLE){;
         Ttheta = computeLQRControl(theta, thetaRate, pendulumPosition, pendulumVelocity);
         float Fm = Ttheta/2;
         float a = Fm / M;
-        vel = lastVel + a * dt; // Ts = 8ms
+        vel = lastVel + a * (Ts/1000); // Ts = 8ms
 
         controlSteps = (vel * STEPS_PER_REVOLUTION) / (2 * PI * wheelRadius);
 
@@ -224,6 +207,8 @@ void controlTask(void *parameter) {
         stepperStates.setMotorSpeed(controlSteps, -controlSteps);
 
         lastVel = vel;
+
+
     } else {
         stepperStates.setMotorSpeed(0, 0);
         vel = 0;
@@ -232,9 +217,10 @@ void controlTask(void *parameter) {
 
     SensorData data = {};
     data.theta = theta;
-    data.pendulumPosition = pendulumPosition;
+    data.thetaRate = thetaRate;
+    // data.pendulumPosition = pendulumPosition;
     data.Ttheta = Ttheta;
-    data.controlSteps = controlSteps;
+    // data.controlSteps = controlSteps;
     // data.h1 = h1;
     // data.h2 = h2;
     // data.h3 = h3;
@@ -254,4 +240,4 @@ float computeLQRControl(float theta, float thetaRate, float position, float velo
           K[2] * position + 
           K[3] * velocity);
     return u;
-}
+} 
