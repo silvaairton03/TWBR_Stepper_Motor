@@ -124,14 +124,14 @@ void loop() {
   unsigned long timerdiff = currentMillis - prevMillis;
   imu.update();
 
-  const float DEADZONE_GYRO = 0.01;
+  // const float DEADZONE_GYRO = 0.01;
 
   theta = imu.getIMUAngleY();
   float thetaRate = imu.getIMUGyroY();
   fusedThetaRate = imu.getFusedRadSpeed();
-  if (fabs(fusedThetaRate) < DEADZONE_GYRO) {
-    thetaRate = 0.0;
-  }
+  // if (fabs(fusedThetaRate) < DEADZONE_GYRO) {
+  //   thetaRate = 0.0;
+  // }
   pendulumPosition = stepperStates.getRobotPosition();
   pendulumVelocity = stepperStates.getRobotVelocity();
 
