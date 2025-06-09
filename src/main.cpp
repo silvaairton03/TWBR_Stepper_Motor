@@ -39,9 +39,9 @@ float a = 0.0;
 float vel = 0.0;
 
 //Ganhos para modelo do pêndulo sobre o carro
-// float K1[4] = {-49.9657,   -4.7947,  -16.3911,  -11.3871};//-5 graus
-// float K2[4] = {-39.7073,   -3.4122,  -10.6711,   -7.6583};
-// float K3[4] = {-49.9657,   -4.7947,  -16.3911,  -11.3871};//-2 graus
+float K1[4] = {-49.9657,   -4.7947,  -16.3911,  -11.3871};//-5 graus
+float K2[4] = {-39.7073,   -3.4122,  -10.6711,   -7.6583};
+float K3[4] = {-49.9657,   -4.7947,  -16.3911,  -11.3871};//-2 graus
 
 float Ts = 8;
 
@@ -91,8 +91,8 @@ void setup(){
 
     
     // tsController.set5Gains(K1, K2, K3, K4, K5);
-    // tsController.setSigmaDegrees(2);
-    // tsController.set3Gains(K1, K2, K3);
+    tsController.setSigmaDegrees(2);
+    tsController.set3Gains(K1, K2, K3);
 
     //------------------INICIALIZAÇÃO DOS MOTORES---------------//
     stepperStates.enableMotors(EN);
@@ -171,7 +171,7 @@ void controlTask(void *parameter) {
     stepperStates.update();
 
     theta = imu.getIMUAngleY();
-    thetaRate = imu.getFusedRadSpeed();
+    thetaRate = imu.getIMUGyroY();
     // if (fabs(thetaRate) < DEADZONE_GYRO) {
     //   thetaRate = 0.0;
     // }
@@ -179,7 +179,7 @@ void controlTask(void *parameter) {
     pendulumVelocity = stepperStates.getRobotVelocity();
 
     if (fabs(theta) < SAFE_ANGLE){;
-        Ttheta = computeLQRControl(theta, thetaRate, pendulumPosition, pendulumVelocity);
+        Ttheta = tsController.computeControl3mf(theta, thetaRate, pendulumPosition, pendulumVelocity);
         float Fm = Ttheta/2;
         float a = Fm / M;
         vel = lastVel + a * (Ts/1000); // Ts = 8ms
