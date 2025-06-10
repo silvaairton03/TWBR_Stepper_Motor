@@ -31,7 +31,7 @@ void IRAM_ATTR onTimerLeft();
 void IRAM_ATTR onTimerRight();
 void controlTask(void *parameter);
 
-float computeLQRControl(float theta, float thetaRate, float position, float velocity);
+// float computeLQRControl(float theta, float thetaRate, float position, float velocity);
 
 float controlSteps = 0.0;
 float Fm = 0.0, M = 0.208;
@@ -171,7 +171,7 @@ void controlTask(void *parameter) {
     stepperStates.update();
 
     theta = imu.getIMUAngleY();
-    thetaRate = imu.getIMUGyroY();
+    thetaRate = imu.getFusedRadSpeed();
     // if (fabs(thetaRate) < DEADZONE_GYRO) {
     //   thetaRate = 0.0;
     // }
@@ -210,12 +210,12 @@ void controlTask(void *parameter) {
   }
 }
 
-float computeLQRControl(float theta, float thetaRate, float position, float velocity) {
-    float u = 0;
-    float K[4] = {-38.2034,   -3.7559,  -10.8308, -7.8431};
-    u = -(K[0] * theta + 
-          K[1] * thetaRate + 
-          K[2] * position + 
-          K[3] * velocity);
-    return u;
-} 
+// float computeLQRControl(float theta, float thetaRate, float position, float velocity) {
+//     float u = 0;
+//     float K[4] = {-38.2034,   -3.7559,  -10.8308, -7.8431};
+//     u = -(K[0] * theta + 
+//           K[1] * thetaRate + 
+//           K[2] * position + 
+//           K[3] * velocity);
+//     return u;
+// } 
