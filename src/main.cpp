@@ -1,7 +1,7 @@
 
 #include <Arduino.h>
 #include <Wire.h>
-// #include "MPU6050_light.h"
+#include "MPU6050_light.h"
 #include"MeasuresIMU.h"
 #include<AccelStepper.h>
 #include"stepper.h"
@@ -67,7 +67,7 @@ void setup(){
     pinMode(2, OUTPUT);
     Serial.begin(115200);
 
-    // Wire.begin(21,22,800000L);
+    Wire.begin(21,22,800000L);
 
     delay(1000);
     
@@ -108,27 +108,27 @@ void setup(){
     delay(1000);
     // //------------------------------------------------------------//
 
-    // //-----------------CONFIGURAÇÃO MPU6050-----------------------//
-  //   if (imu.beginWithLogging(0, 0, true) != 0) {
-  //     Serial.println("MPU6050 failed!");
-  //     while (1);
-  //   }
+    //-----------------CONFIGURAÇÃO MPU6050-----------------------//
+    if (imu.beginWithLogging(0, 0, true) != 0) {
+      Serial.println("MPU6050 failed!");
+      while (1);
+    }
 
-  //  //------------------------------------------------------------//
+   //------------------------------------------------------------//
     
-  //   delay(2000);
+    delay(2000);
 }
 
 void loop() {
   currentMillis = millis();
   unsigned long timerdiff = currentMillis - prevMillis;
-  // imu.update();
+  imu.update();
 
   // // const float DEADZONE_GYRO = 0.01;
 
-  // theta = imu.getIMUAngleY();
+  theta = imu.getIMUAngleY();
   // float thetaRate = imu.getIMUGyroY();
-  // fusedThetaRate = imu.getFusedRadSpeed();
+  fusedThetaRate = imu.getFusedRadSpeed();
   // // if (fabs(fusedThetaRate) < DEADZONE_GYRO) {
   // //   thetaRate = 0.0;
   // // }
@@ -136,22 +136,22 @@ void loop() {
   pendulumVelocity = stepperStates.getRobotVelocity();
 
 
-  // float sigma = radians(20);
-  // float mf1 = exp(-pow((theta - radians(0)) / sigma, 2));
-  // float mf2 = exp(-pow((theta - radians(30)) / sigma, 2));
-  // float mf3 = exp(-pow((theta + radians(30)) / sigma, 2));
-  // float mf4 = exp(-pow((theta - radians(45)) / sigma, 2));
-  // float mf5 = exp(-pow((theta + radians(45)) / sigma, 2));
+  float sigma = radians(20);
+  float mf1 = exp(-pow((theta - radians(0)) / sigma, 2));
+  float mf2 = exp(-pow((theta - radians(30)) / sigma, 2));
+  float mf3 = exp(-pow((theta + radians(30)) / sigma, 2));
+  float mf4 = exp(-pow((theta - radians(45)) / sigma, 2));
+  float mf5 = exp(-pow((theta + radians(45)) / sigma, 2));
 
   // // float total = mf1 + mf2 + mf3;
-  // float total = mf1 + mf2 + mf3 + mf4 + mf5;
-  // float h1 = mf1 / total;
-  // float h2 = mf2 / total;
-  // float h3 = mf3 / total;
-  // float h4 = mf4 / total;
-  // float h5 = mf5 / total;
+  float total = mf1 + mf2 + mf3 + mf4 + mf5;
+  float h1 = mf1 / total;
+  float h2 = mf2 / total;
+  float h3 = mf3 / total;
+  float h4 = mf4 / total;
+  float h5 = mf5 / total;
 
-  // float x[4] = {theta, fusedThetaRate, pendulumPosition, pendulumVelocity};
+  float x[4] = {theta, fusedThetaRate, pendulumPosition, pendulumVelocity};
 
   // // Auto reset if robot is vertically balanced and stable
   // // if (fabs(theta) < 0.02 && fabs(fusedThetaRate) < 0.05) {
@@ -159,46 +159,46 @@ void loop() {
   // //   pendulumVelocity = 0;
   // // }
 
-  // float u = 0.0;
+  float u = 0.0;
   if (timerdiff >= Ts) {
     stepperStates.update();
 
-  //   if (fabs(theta) < SAFE_ANGLE) {
-  //     // Controle Fuzzy TS com 3 MF
-  //     for (int i = 0; i < 4; i++) {
-  //       float Ki = h1 * K1[i] + h2 * K2[i] + h3 * K3[i];
-  //       u += -Ki * x[i];
-  //     }
+    if (fabs(theta) < SAFE_ANGLE) {
+      // Controle Fuzzy TS com 3 MF
+      // for (int i = 0; i < 4; i++) {
+      //   float Ki = h1 * K1[i] + h2 * K2[i] + h3 * K3[i];
+      //   u += -Ki * x[i];
+      // }
 
-  //     //Para cinco funções de pertinência
-  //     // for (int i = 0; i < 4; i++) {
-  //     //   float Ki = h1 * K1[i] + h2 * K2[i] + h3 * K3[i] + h4 * K4[i] + h5 * K5[i];
-  //     //   u += -Ki * x[i];
-  //     // }
+      //Para cinco funções de pertinência
+      for (int i = 0; i < 4; i++) {
+        float Ki = h1 * K1[i] + h2 * K2[i] + h3 * K3[i] + h4 * K4[i] + h5 * K5[i];
+        u += -Ki * x[i];
+      }
 
-  //     float Fm = u / 2.0;
-  //     float a = Fm / M;
-  //     float vel = lastVel + a * (Ts / 1000.0);
+      float Fm = u / 2.0;
+      float a = Fm / M;
+      float vel = lastVel + a * (Ts / 1000.0);
 
-  //     if (fabs(vel) > 1.0) vel = (vel > 0) ? 1.0 : -1.0;
+      if (fabs(vel) > 1.0) vel = (vel > 0) ? 1.0 : -1.0;
 
-  //     float controlSteps = (vel * STEPS_PER_REVOLUTION) / (2 * PI * wheelRadius);
+      float controlSteps = (vel * STEPS_PER_REVOLUTION) / (2 * PI * wheelRadius);
 
-  //     if (fabs(controlSteps) > MAX_STEPS) {
-  //       controlSteps = (controlSteps > 0) ? MAX_STEPS : -MAX_STEPS;
-  //     }
+      if (fabs(controlSteps) > MAX_STEPS) {
+        controlSteps = (controlSteps > 0) ? MAX_STEPS : -MAX_STEPS;
+      }
 
     // stepperLeft.setSpeed(8000);
     // stepperRight.setSpeed(-8000);
 
 
-    //   lastVel = vel;
-    // } else {
-    //   stepperLeft.setSpeed(0);
-    //   stepperRight.setSpeed(0);
-    //   lastVel = 0;
-    //   u = 0;
-    // }
+      lastVel = vel;
+    } else {
+      stepperLeft.setSpeed(0);
+      stepperRight.setSpeed(0);
+      lastVel = 0;
+      u = 0;
+    }
 
     prevMillis = currentMillis;
   }
