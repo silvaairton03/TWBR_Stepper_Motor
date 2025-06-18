@@ -2,14 +2,14 @@
 #include <Arduino.h>
 #include <Wire.h>
 #include <AccelStepper.h>
-#include <freertos/FreeRTOS.h>
-#include <freertos/queue.h>
+// #include <freertos/FreeRTOS.h>
+// #include <freertos/queue.h>
 #include "MeasuresIMU.h"
 #include "stepper.h"
 #include "TS_Fuzzy.h"
 
 // #define AS5600_ADDRESS 0x36
-#define SAFE_ANGLE 0.5 //rad
+#define SAFE_ANGLE 0.4 //rad
 #define MAX_STEPS 8000
 #define MICROSTEP_DIVISOR 32
 #define STEPS_PER_REVOLUTION 6400
@@ -29,9 +29,10 @@ stepper stepperStates(STEP, DIR, STEP_2, DIR_2,
 
 void IRAM_ATTR onTimerLeft();
 void IRAM_ATTR onTimerRight();
-void controlTask(void *parameter);
+// void controlTask(void *parameter);
 
-// float computeLQRControl(float theta, float thetaRate, float position, float velocity);
+float computeLQRControl(float theta, float thetaRate, float position, float velocity);
+const float K_LQR[4] = {-38.2034, -3.7559, -10.8308, -7.8431};
 
 float controlSteps = 0.0;
 float Fm = 0.0, M = 0.208;
@@ -48,105 +49,138 @@ float Ts = 8;
 float Ttheta = 0.0;
 float theta = 0.0, thetaRate = 0.0;
 float pendulumPosition = 0.0, pendulumVelocity = 0.0;
-volatile float refPosition = 0.0f;
-bool referenceEnabled = false; //Flag para ativar a referência
-unsigned long referenceStartTime = 0; //Intervalo que o sinal de refeerência inicia
-float errorPosition = 0.0;
-volatile float thetaDeg = 0.0;
-volatile float thetaRateDeg = 0.0;
+// volatile float refPosition = 0.0f;
+// bool referenceEnabled = false; //Flag para ativar a referência
+// unsigned long referenceStartTime = 0; //Intervalo que o sinal de refeerência inicia
+// float errorPosition = 0.0;
 
 
 unsigned long currentMillis;
-static unsigned long prevMillis = 0;
+static unsigned long prevControlMillis = 0; 
+static unsigned long prevSerialMillis = 0;
+const unsigned long controlInterval = 8;
+const unsigned long serialInterval = 8; 
 
 float lastVel = 0;
 
-typedef struct {
-  float theta;
-  float thetaRate;
-  // float pendulumPosition;
-  // float pendulumVelocity;
-  // float Ttheta;
-  // float controlSteps;
-  // float h1, h2, h3;
-  // float refPosition;
-} SensorData;
+// typedef struct {
+//   float theta;
+//   float thetaRate;
+//   // float pendulumPosition;
+//   // float pendulumVelocity;
+//   // float Ttheta;
+//   // float controlSteps;
+//   // float h1, h2, h3;
+//   // float refPosition;
+// } SensorData;
 
-TaskHandle_t controlTaskHandle = NULL;
-QueueHandle_t dataQueue;
+// TaskHandle_t controlTaskHandle = NULL;
+// QueueHandle_t dataQueue;
 
 
 void setup(){
-    pinMode(2, OUTPUT);
-    Serial.begin(115200);
-    Wire.begin(21,22,800000L);
+  pinMode(2, OUTPUT);
+  Serial.begin(115200);
+  Wire.begin(21,22,800000L);
 
-    delay(1000);
+  delay(1000);
 
-    dataQueue = xQueueCreate(100, sizeof(SensorData));
-    if (dataQueue == NULL) {
-      Serial.println("Erro ao criar a fila!");
-      while (true);  // trava o sistema se falhar
-    }
+  // dataQueue = xQueueCreate(100, sizeof(SensorData));
+  // if (dataQueue == NULL) {
+  //   Serial.println("Erro ao criar a fila!");
+  //   while (true);  // trava o sistema se falhar
+  // }
 
-    
-    // tsController.set5Gains(K1, K2, K3, K4, K5);
-    tsController.setSigmaDegrees(2);
-    tsController.set3Gains(K1, K2, K3);
+  
+  // tsController.set5Gains(K1, K2, K3, K4, K5);
+  // tsController.setSigmaDegrees(2);
+  // tsController.set3Gains(K1, K2, K3);
 
-    //------------------INICIALIZAÇÃO DOS MOTORES---------------//
-    stepperStates.enableMotors(EN);
-    stepperStates.resetSteps();
-    stepperStates.initMotors(MAX_STEPS, 6000);
-    stepperStates.initTimers(onTimerLeft, onTimerRight);
-    //------------------------------------------------------------//
+  //------------------INICIALIZAÇÃO DOS MOTORES---------------//
+  stepperStates.enableMotors(EN);
+  stepperStates.resetSteps();
+  stepperStates.initMotors(MAX_STEPS, 10000);
+  stepperStates.initTimers(onTimerLeft, onTimerRight);
+  //------------------------------------------------------------//
 
-    //-----------------CONFIGURAÇÃO MPU6050-----------------------//
-    byte status = imu.beginWithLogging(0, 0, true);
-    if (status != 0) {
-        Serial.println(F("MPU6050 initialization failed!"));
-        while (true); // trava o sistema caso a inicialização falhe
-    }
-   //------------------------------------------------------------//
+  //-----------------CONFIGURAÇÃO MPU6050-----------------------//
+  byte status = imu.beginWithLogging(0, 0, true);
+  if (status != 0) {
+      Serial.println(F("MPU6050 initialization failed!"));
+      while (true); // trava o sistema caso a inicialização falhe
+  }
+  //------------------------------------------------------------//
 
-    delay(1000);
+  delay(1000);
 
-    xTaskCreatePinnedToCore(
-      controlTask,           // função da task
-      "ControlTask",         // nome
-      8192,                  // stack size
-      NULL,                  // param
-      1,                     // prioridade
-      &controlTaskHandle,    // handle
-      1                      // core 1 (para isolar do WiFi/loop)
-    );
+    // xTaskCreatePinnedToCore(
+    //   controlTask,           // função da task
+    //   "ControlTask",         // nome
+    //   8192,                  // stack size
+    //   NULL,                  // param
+    //   1,                     // prioridade
+    //   &controlTaskHandle,    // handle
+    //   1                      // core 1 (para isolar do WiFi/loop)
+    // );
 
-    referenceStartTime = millis();
+    // referenceStartTime = millis();
 
-    xTaskCreatePinnedToCore(
-      [](void *param) {
-        SensorData received;
-        while (true) {
-          if (xQueueReceive(dataQueue, &received, portMAX_DELAY)) {
+    // xTaskCreatePinnedToCore(
+    //   [](void *param) {
+    //     SensorData received;
+    //     while (true) {
+    //       if (xQueueReceive(dataQueue, &received, portMAX_DELAY)) {
             
-            Serial.print(received.theta * RAD_TO_DEG); Serial.print(",");
-            Serial.println(received.thetaRate * RAD_2_DEG); 
-          }
+    //         Serial.print(received.theta * RAD_TO_DEG); Serial.print(",");
+    //         Serial.println(received.thetaRate * RAD_2_DEG); 
+    //       }
 
-          vTaskDelay(pdMS_TO_TICKS(8));
-        }
-      },
-      "TransmitTask",
-      4096,
-      NULL,
-      1,
-      NULL,
-      0 // Core 0
-    );
-
+    //       vTaskDelay(pdMS_TO_TICKS(8));
+    //     }
+    //   },
+    //   "TransmitTask",
+    //   4096,
+    //   NULL,
+    //   1,
+    //   NULL,
+    //   0 // Core 0
+    // );
+  prevControlMillis = millis();
 }
 
 void loop(){
+  currentMillis = millis();
+   if (currentMillis - prevControlMillis >= Ts){
+    prevControlMillis = currentMillis;
+    imu.update();
+    imu.updateFilter();
+    stepperStates.update();
+
+    theta = imu.getIMUAngleY(); // Ângulo do pêndulo em radianos
+    thetaRate = imu.getIMUGyroY(); // Velocidade angular do pêndulo em rad/s
+    pendulumPosition = stepperStates.getRobotPosition(); // Posição do robô
+    pendulumVelocity = stepperStates.getRobotVelocity();
+
+    if (fabs(theta) < SAFE_ANGLE){
+      Ttheta = computeLQRControl(theta, thetaRate, pendulumPosition, pendulumVelocity);
+      float Fm = Ttheta / 2.0; 
+      float a = Fm / M; 
+      vel = lastVel + a * (Ts / 1000.0);
+
+      controlSteps = (vel * STEPS_PER_REVOLUTION) / (2 * PI * wheelRadius);
+      controlSteps = constrain(controlSteps, -MAX_STEPS, MAX_STEPS);
+      stepperStates.setMotorSpeed(controlSteps, -controlSteps);
+
+      lastVel = vel; 
+    } else{
+      stepperStates.setMotorSpeed(0, 0);
+      vel = 0;
+      lastVel = 0;
+    }
+  }
+
+  // Serial.print(theta * RAD_TO_DEG); Serial.print(",");
+  // Serial.println(thetaRate * RAD_2_DEG); 
 }
 
 
@@ -158,64 +192,63 @@ void IRAM_ATTR onTimerRight() {
   stepperStates.runRightMotor();
 }
 
-void controlTask(void *parameter) {
-  TickType_t xLastWakeTime = xTaskGetTickCount();
-  const TickType_t xFrequency = pdMS_TO_TICKS(8); // 8ms
-  // const float dt = pdTICKS_TO_MS(xFrequency) / 1000.0f;
-  // const float DEADZONE_GYRO = 0.01;
+// void controlTask(void *parameter) {
+//   TickType_t xLastWakeTime = xTaskGetTickCount();
+//   const TickType_t xFrequency = pdMS_TO_TICKS(8); // 8ms
+//   // const float dt = pdTICKS_TO_MS(xFrequency) / 1000.0f;
+//   // const float DEADZONE_GYRO = 0.01;
 
-  while (true) {
+//   while (true) {
 
-    imu.update();
-    imu.updateFilter();
-    stepperStates.update();
+//     imu.update();
+//     imu.updateFilter();
+//     stepperStates.update();
 
-    theta = imu.getIMUAngleY();
-    thetaRate = imu.getFusedRadSpeed();
-    // if (fabs(thetaRate) < DEADZONE_GYRO) {
-    //   thetaRate = 0.0;
-    // }
-    pendulumPosition = stepperStates.getRobotPosition();
-    pendulumVelocity = stepperStates.getRobotVelocity();
+//     theta = imu.getIMUAngleY();
+//     thetaRate = imu.getFusedRadSpeed();
+//     // if (fabs(thetaRate) < DEADZONE_GYRO) {
+//     //   thetaRate = 0.0;
+//     // }
+//     pendulumPosition = stepperStates.getRobotPosition();
+//     pendulumVelocity = stepperStates.getRobotVelocity();
 
-    if (fabs(theta) < SAFE_ANGLE){;
-        Ttheta = tsController.computeControl3mf(theta, thetaRate, pendulumPosition, pendulumVelocity);
-        float Fm = Ttheta/2;
-        float a = Fm / M;
-        vel = lastVel + a * (Ts/1000); // Ts = 8ms
+//     if (fabs(theta) < SAFE_ANGLE){;
+//         Ttheta = computeLQRControl(theta, thetaRate, pendulumPosition, pendulumVelocity);
+//         float Fm = Ttheta/2;
+//         float a = Fm / M;
+//         vel = lastVel + a * (Ts/1000); // Ts = 8ms
 
-        controlSteps = (vel * STEPS_PER_REVOLUTION) / (2 * PI * wheelRadius);
+//         controlSteps = (vel * STEPS_PER_REVOLUTION) / (2 * PI * wheelRadius);
 
-        controlSteps = constrain(controlSteps, -MAX_STEPS, MAX_STEPS);
+//         controlSteps = constrain(controlSteps, -MAX_STEPS, MAX_STEPS);
 
-        stepperStates.setMotorSpeed(controlSteps, -controlSteps);
+//         stepperStates.setMotorSpeed(controlSteps, -controlSteps);
 
-        lastVel = vel;
+//         lastVel = vel;
 
 
-    } else {
-        stepperStates.setMotorSpeed(0, 0);
-        vel = 0;
-        lastVel = 0;
-    }
+//     } else {
+//         stepperStates.setMotorSpeed(0, 0);
+//         vel = 0;
+//         lastVel = 0;
+//     }
 
-    SensorData data = {};
-    data.theta = theta;
-    data.thetaRate = thetaRate;
-    if (xQueueSend(dataQueue, &data, 0) != pdPASS) {
-      Serial.println("Queue full! Dropping data.");
-    }
+//     SensorData data = {};
+//     data.theta = theta;
+//     data.thetaRate = thetaRate;
+//     if (xQueueSend(dataQueue, &data, 0) != pdPASS) {
+//       Serial.println("Queue full! Dropping data.");
+//     }
 
-    vTaskDelayUntil(&xLastWakeTime, xFrequency);
-  }
-}
+//     vTaskDelayUntil(&xLastWakeTime, xFrequency);
+//   }
+// }
 
-// float computeLQRControl(float theta, float thetaRate, float position, float velocity) {
-//     float u = 0;
-//     float K[4] = {-38.2034,   -3.7559,  -10.8308, -7.8431};
-//     u = -(K[0] * theta + 
-//           K[1] * thetaRate + 
-//           K[2] * position + 
-//           K[3] * velocity);
-//     return u;
-// } 
+float computeLQRControl(float theta, float thetaRate, float position, float velocity) {
+    float u = 0;
+    u = -(K_LQR[0] * theta + 
+          K_LQR[1] * thetaRate + 
+          K_LQR[2] * position + 
+          K_LQR[3] * velocity);
+    return u;
+} 
