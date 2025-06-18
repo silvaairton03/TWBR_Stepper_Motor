@@ -104,7 +104,8 @@ void loop(){
 
     theta = imu.getIMUAngleY(); // Ângulo do pêndulo em radianos
     thetaRate = imu.getIMUGyroY(); // Velocidade angular do pêndulo em rad/s
-    pendulumPosition = stepperStates.getRobotPosition(); // Posição do robô
+    // stepperStates.setMotorSpeed(1000, -1000);
+    pendulumPosition = stepperStates.getRobotPosition();
     pendulumVelocity = stepperStates.getRobotVelocity();
 
     if (fabs(theta) < SAFE_ANGLE){
@@ -125,8 +126,9 @@ void loop(){
     }
   }
 
-  // Serial.print(theta * RAD_TO_DEG); Serial.print(",");
-  // Serial.println(thetaRate * RAD_2_DEG); 
+  Serial.print(theta * RAD_TO_DEG); Serial.print(",");
+  Serial.print(thetaRate * RAD_2_DEG); Serial.print(",");
+  Serial.println(thetaRate * RAD_2_DEG); 
 }
 
 
