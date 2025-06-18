@@ -63,34 +63,12 @@ const unsigned long serialInterval = 8;
 
 float lastVel = 0;
 
-// typedef struct {
-//   float theta;
-//   float thetaRate;
-//   // float pendulumPosition;
-//   // float pendulumVelocity;
-//   // float Ttheta;
-//   // float controlSteps;
-//   // float h1, h2, h3;
-//   // float refPosition;
-// } SensorData;
-
-// TaskHandle_t controlTaskHandle = NULL;
-// QueueHandle_t dataQueue;
-
-
 void setup(){
   pinMode(2, OUTPUT);
   Serial.begin(115200);
   Wire.begin(21,22,800000L);
 
   delay(1000);
-
-  // dataQueue = xQueueCreate(100, sizeof(SensorData));
-  // if (dataQueue == NULL) {
-  //   Serial.println("Erro ao criar a fila!");
-  //   while (true);  // trava o sistema se falhar
-  // }
-
   
   // tsController.set5Gains(K1, K2, K3, K4, K5);
   // tsController.setSigmaDegrees(2);
@@ -113,38 +91,6 @@ void setup(){
 
   delay(1000);
 
-    // xTaskCreatePinnedToCore(
-    //   controlTask,           // função da task
-    //   "ControlTask",         // nome
-    //   8192,                  // stack size
-    //   NULL,                  // param
-    //   1,                     // prioridade
-    //   &controlTaskHandle,    // handle
-    //   1                      // core 1 (para isolar do WiFi/loop)
-    // );
-
-    // referenceStartTime = millis();
-
-    // xTaskCreatePinnedToCore(
-    //   [](void *param) {
-    //     SensorData received;
-    //     while (true) {
-    //       if (xQueueReceive(dataQueue, &received, portMAX_DELAY)) {
-            
-    //         Serial.print(received.theta * RAD_TO_DEG); Serial.print(",");
-    //         Serial.println(received.thetaRate * RAD_2_DEG); 
-    //       }
-
-    //       vTaskDelay(pdMS_TO_TICKS(8));
-    //     }
-    //   },
-    //   "TransmitTask",
-    //   4096,
-    //   NULL,
-    //   1,
-    //   NULL,
-    //   0 // Core 0
-    // );
   prevControlMillis = millis();
 }
 
@@ -192,57 +138,6 @@ void IRAM_ATTR onTimerRight() {
   stepperStates.runRightMotor();
 }
 
-// void controlTask(void *parameter) {
-//   TickType_t xLastWakeTime = xTaskGetTickCount();
-//   const TickType_t xFrequency = pdMS_TO_TICKS(8); // 8ms
-//   // const float dt = pdTICKS_TO_MS(xFrequency) / 1000.0f;
-//   // const float DEADZONE_GYRO = 0.01;
-
-//   while (true) {
-
-//     imu.update();
-//     imu.updateFilter();
-//     stepperStates.update();
-
-//     theta = imu.getIMUAngleY();
-//     thetaRate = imu.getFusedRadSpeed();
-//     // if (fabs(thetaRate) < DEADZONE_GYRO) {
-//     //   thetaRate = 0.0;
-//     // }
-//     pendulumPosition = stepperStates.getRobotPosition();
-//     pendulumVelocity = stepperStates.getRobotVelocity();
-
-//     if (fabs(theta) < SAFE_ANGLE){;
-//         Ttheta = computeLQRControl(theta, thetaRate, pendulumPosition, pendulumVelocity);
-//         float Fm = Ttheta/2;
-//         float a = Fm / M;
-//         vel = lastVel + a * (Ts/1000); // Ts = 8ms
-
-//         controlSteps = (vel * STEPS_PER_REVOLUTION) / (2 * PI * wheelRadius);
-
-//         controlSteps = constrain(controlSteps, -MAX_STEPS, MAX_STEPS);
-
-//         stepperStates.setMotorSpeed(controlSteps, -controlSteps);
-
-//         lastVel = vel;
-
-
-//     } else {
-//         stepperStates.setMotorSpeed(0, 0);
-//         vel = 0;
-//         lastVel = 0;
-//     }
-
-//     SensorData data = {};
-//     data.theta = theta;
-//     data.thetaRate = thetaRate;
-//     if (xQueueSend(dataQueue, &data, 0) != pdPASS) {
-//       Serial.println("Queue full! Dropping data.");
-//     }
-
-//     vTaskDelayUntil(&xLastWakeTime, xFrequency);
-//   }
-// }
 
 float computeLQRControl(float theta, float thetaRate, float position, float velocity) {
     float u = 0;
