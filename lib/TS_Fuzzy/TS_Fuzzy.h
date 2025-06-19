@@ -1,36 +1,38 @@
 #ifndef TS_FUZZY_H
 #define TS_FUZZY_H
 
-#include<Arduino.h>
+#include <Arduino.h>
 #include <math.h>
 
-class TS_Fuzzy{
+
+class TS_Fuzzy {
 public:
+    enum Mode {MF3 = 3, MF5 = 5};
+    // Constructor
     TS_Fuzzy();
 
-    void set3Gains(const float* k1, const float* k2, const float* k3);
+    void setSigmaDegrees(float deg);
+    void setMode(Mode m);
 
-    void set5Gains(const float* k1, const float* k2, const float* k3,
-        const float* k4, const float* k5);
-        
-    void set7Gains(const float* k1, const float* k2, const float* k3,
-        const float* k4, const float* k5, const float* k6, const float* k7);    
+    void set3Gains(const float K1[4], const float K2[4], const float K3[4]);
 
-    float computeControl3mf(float theta, float thetaRate, float pos, float vel);
-    float computeControl5mf(float theta, float thetaRate, float pos, float vel);
-    float computeControl7mf(float theta, float thetaRate, float pos, float vel);
+    void set5Gains(const float K1[4], const float K2[4], const float K3[4],
+                   const float K4[4], const float K5[4]);
 
-private:
-    float K[7][4];       // Matriz de ganhos para 5 modelos (5 regras), cada um com 4 variáveis de estado
-    float sigma;
+    float computeControl(float theta, float thetaRate, float pos, float vel);
+
     
-    void compute3Memberships(float theta, float& h1, float& h2, float& h3);
-    void compute5Memberships(float theta, float& h1, float& h2, float& h3, float& h4, float& h5);
-    void compute7Memberships(float theta, float& h1, float& h2, float& h3, float& h4, float& h5, float& h6, float& h7);
-
-    const  float DEG_30 = radians(30.0f);
-    const float DEG_45 = radians(45.0f);
-    const float DEG_60 = radians(60.0f);
+private:
+    void compute3Memberships(float theta, float &h1, float &h2, float &h3);
+    
+    void compute5Memberships(float theta, float &h1, float &h2, float &h3, float &h4, float &h5);
+    float K[5][4]; 
+    float sigma;
+    float invSigmaSq;
+    Mode mode;
+    
+    static constexpr float DEG_2 = 0.034906585f;
+    static constexpr float DEG_5 = 0.087266462f;
 };
 
-#endif
+#endif // TS_FUZZY_H

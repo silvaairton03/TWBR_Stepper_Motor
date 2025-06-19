@@ -1,129 +1,97 @@
-#include"TS_Fuzzy.h"
+#include "TS_Fuzzy.h"
 
-TS_Fuzzy::TS_Fuzzy(){
-    sigma = radians(20.0f);
-    memset(K, 0, sizeof(K));
+TS_Fuzzy::TS_Fuzzy() {
+    setSigmaDegrees(1.0f);
+    mode = MF3;
+
+    for (int i = 0; i <5; i++)
+        for (int j = 0; j < 4; j++)
+            K[i][j] = 0.0f;
 }
 
-
-void TS_Fuzzy::set3Gains(const float K1[4], const float K2[4], const float K3[4])
-{
-    memcpy(K[0], K1, sizeof(float) * 4);
-    memcpy(K[1], K2, sizeof(float) * 4);
-    memcpy(K[2], K3, sizeof(float) * 4);
+void TS_Fuzzy::setSigmaDegrees(float deg) {
+    sigma = radians(deg);
+    invSigmaSq = 1.0f / (sigma * sigma);
 }
 
-void TS_Fuzzy::set5Gains(const float K1[4], const float K2[4], const float K3[4], const float K4[4], const float K5[4]){
-    memcpy(K[0], K1, sizeof(float) * 4);
-    memcpy(K[1], K2, sizeof(float) * 4);
-    memcpy(K[2], K3, sizeof(float) * 4);
-    memcpy(K[3], K4, sizeof(float) * 4);
-    memcpy(K[4], K5, sizeof(float) * 4);
+void TS_Fuzzy::setMode(Mode m) {
+    mode = m;
 }
 
-void TS_Fuzzy::set7Gains(const float K1[4], const float K2[4], const float K3[4], const float K4[4], const float K5[4],
-                const float K6[4], const float K7[4])
-{
-    memcpy(K[0], K1, sizeof(float) * 4);
-    memcpy(K[1], K2, sizeof(float) * 4);
-    memcpy(K[2], K3, sizeof(float) * 4);
-    memcpy(K[3], K4, sizeof(float) * 4);
-    memcpy(K[4], K5, sizeof(float) * 4);
-    memcpy(K[5], K6, sizeof(float) * 4);
-    memcpy(K[6], K7, sizeof(float) * 4);
-
+void TS_Fuzzy::set3Gains(const float K1[4], const float K2[4], const float K3[4]) {
+    for (int i = 0; i < 4; i++) {
+        K[0][i] = K1[i];
+        K[1][i] = K2[i];
+        K[2][i] = K3[i];
+    }
 }
 
-void TS_Fuzzy::compute3Memberships(float theta, float &h1, float &h2, float &h3){
-    float mf1 = exp(-pow((theta - radians(0.0f)) / sigma, 2));
-    float mf2 = exp(-pow((theta - DEG_30) / sigma, 2));
-    float mf3 = exp(-pow((theta + DEG_30) / sigma, 2));
+void TS_Fuzzy::set5Gains(const float K1[4], const float K2[4], const float K3[4],
+                         const float K4[4], const float K5[4]) {
+    for (int i = 0; i < 4; i++) {
+        K[0][i] = K1[i];
+        K[1][i] = K2[i];
+        K[2][i] = K3[i];
+        K[3][i] = K4[i];
+        K[4][i] = K5[i];
+    }
+}
+
+void TS_Fuzzy::compute3Memberships(float theta, float &h1, float &h2, float &h3) {
+    float mf1 = expf(-((theta + DEG_2) * (theta + DEG_2)) * invSigmaSq);
+    float mf2 = expf(-(theta * theta) * invSigmaSq);
+    float mf3 = expf(-((theta - DEG_2) * (theta - DEG_2)) * invSigmaSq);
 
     float total = mf1 + mf2 + mf3;
-
-    h1 = mf1 / total;
-    h2 = mf2 / total;
-    h3 = mf3 / total;
+    if (total < 1e-6f) {
+        h1 = h2 = h3 = 1.0f / 3.0f;
+    } else {
+        h1 = mf1 / total;
+        h2 = mf2 / total;
+        h3 = mf3 / total;
+    }
 }
 
-void TS_Fuzzy::compute5Memberships(float theta, float &h1, float &h2, float &h3, float &h4, float &h5){
-    float mf1 = exp(-pow((theta - radians(0.0f)) / sigma, 2));
-    float mf2 = exp(-pow((theta - DEG_30) / sigma, 2));
-    float mf3 = exp(-pow((theta + DEG_30) / sigma, 2));
-    float mf4 = exp(-pow((theta - DEG_45) / sigma, 2));
-    float mf5 = exp(-pow((theta + DEG_45) / sigma, 2));
+void TS_Fuzzy::compute5Memberships(float theta, float &h1, float &h2, float &h3, float &h4, float &h5) {
+    float mf1 = expf(-((theta + DEG_5) * (theta + DEG_5)) * invSigmaSq);
+    float mf2 = expf(-((theta + DEG_2) * (theta + DEG_2)) * invSigmaSq);
+    float mf3 = expf(-(theta * theta) * invSigmaSq);
+    float mf4 = expf(-((theta - DEG_2) * (theta - DEG_2)) * invSigmaSq);
+    float mf5 = expf(-((theta - DEG_5) * (theta - DEG_5)) * invSigmaSq);
 
     float total = mf1 + mf2 + mf3 + mf4 + mf5;
-
-    h1 = mf1 / total;
-    h2 = mf2 / total;
-    h3 = mf3 / total;
-    h4 = mf4 / total;
-    h5 = mf5 / total;
+    if (total < 1e-6f) {
+        h1 = h2 = h3 = h4 = h5 = 1.0f / 5.0f;
+    } else {
+        h1 = mf1 / total;
+        h2 = mf2 / total;
+        h3 = mf3 / total;
+        h4 = mf4 / total;
+        h5 = mf5 / total;
+    }
 }
 
-void TS_Fuzzy::compute7Memberships(float theta, float &h1, float &h2, float &h3, float &h4, float &h5, float &h6, float &h7){
-    float mf1 = exp(-pow((theta - radians(0.0f)) / sigma, 2));
-    float mf2 = exp(-pow((theta - DEG_30) / sigma, 2));
-    float mf3 = exp(-pow((theta + DEG_30) / sigma, 2));
-    float mf4 = exp(-pow((theta - DEG_45) / sigma, 2));
-    float mf5 = exp(-pow((theta + DEG_45) / sigma, 2));
-    float mf6 = exp(-pow((theta - DEG_60) / sigma, 2));
-    float mf7 = exp(-pow((theta + DEG_60) / sigma, 2));
-
-    float total = mf1 + mf2 + mf3 + mf4 + mf5 + mf6 + mf7;
-
-    h1 = mf1 / total;
-    h2 = mf2 / total;
-    h3 = mf3 / total;
-    h4 = mf4 / total;
-    h5 = mf5 / total;
-    h6 = mf6 / total;
-    h7 = mf7 / total;
-}
-
-float TS_Fuzzy::computeControl3mf(float theta, float thetaRate, float pos, float vel)
-{
-    float h1, h2, h3;
-    compute3Memberships(theta, h1, h2, h3);
+float TS_Fuzzy::computeControl(float theta, float thetaRate, float pos, float vel) {
+    float h[5] = {0};  // Máximo 5 MF
     float x[4] = {theta, thetaRate, pos, vel};
-    float u = 0.0f;
 
+    // Cálculo das pertinências
+    if (mode == MF3) {
+        compute3Memberships(theta, h[0], h[1], h[2]);
+    } else {
+        compute5Memberships(theta, h[0], h[1], h[2], h[3], h[4]);
+    }
+
+    // Cálculo do controle
+    float u = 0.0f;
     for (int i = 0; i < 4; i++) {
-        float Ki = h1 * K[0][i] + h2 * K[1][i] + h3 * K[2][i];
-        u += -Ki * x[i];
+        float Ki = 0.0f;
+        for (int j = 0; j < (int)mode; j++) {
+            Ki += h[j] * K[j][i];
+        }
+        u -= Ki * x[i];
     }
 
     return u;
 }
 
-float TS_Fuzzy::computeControl5mf(float theta, float thetaRate, float pos, float vel){
-    float h1, h2, h3, h4, h5;
-    compute5Memberships(theta, h1, h2, h3, h4, h5);
-
-    float x[4] = {theta, thetaRate, pos, vel};
-    float u = 0.0f;
-
-    for (int i = 0; i < 4; i++) {
-        float Ki = h1 * K[0][i] + h2 * K[1][i] + h3 * K[2][i] + h4 * K[3][i] + h5 * K[4][i];
-        u += -Ki * x[i];
-    }
-
-    return u;
-}
-
-float TS_Fuzzy::computeControl7mf(float theta, float thetaRate, float pos, float vel){
-    float h1, h2, h3, h4, h5, h6, h7;
-    compute7Memberships(theta, h1, h2, h3, h4, h5, h6, h7);
-
-    float x[4] = {theta, thetaRate, pos, vel};
-    float u = 0.0f;
-
-    for (int i = 0; i < 4; i++) {
-        float Ki = h1 * K[0][i] + h2 * K[1][i] + h3 * K[2][i] + h4 * K[3][i] + h5 * K[4][i] + h6 * K[5][i] + h7 * K[6][i];
-        u += -Ki * x[i];
-    }
-
-    return u;
-
-}
