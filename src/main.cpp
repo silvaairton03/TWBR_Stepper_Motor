@@ -96,6 +96,7 @@ void setup(){
 
 void loop(){
   currentMillis = millis();
+
    if (currentMillis - prevControlMillis >= Ts){
     prevControlMillis = currentMillis;
     imu.update();
@@ -103,7 +104,7 @@ void loop(){
     stepperStates.update();
 
     theta = imu.getIMUAngleY(); // Ângulo do pêndulo em radianos
-    thetaRate = imu.getIMUGyroY(); // Velocidade angular do pêndulo em rad/s
+    thetaRate = imu.getFusedRadSpeed(); // Velocidade angular do pêndulo em rad/s
     // stepperStates.setMotorSpeed(1000, -1000);
     pendulumPosition = stepperStates.getRobotPosition();
     pendulumVelocity = stepperStates.getRobotVelocity();
