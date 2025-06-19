@@ -3,8 +3,8 @@
 #include <Wire.h>
 #include "MPU6050_light.h"
 #include<AccelStepper.h>
-#include"stepper.h"
-#include"AS5600Sensor.h"
+#include "TS_Fuzzy.h"
+#include "stepper.h"
 
 #define STEPS_PER_REVOLUTION 6400
 #define SAFE_ANGLE 0.6 //rad
@@ -12,6 +12,7 @@
 #define MICROSTEP_DIVISOR 32
 
 MPU6050 mpu(Wire);
+TS_Fuzzy fuzzy;
 
 volatile bool updateMotors = false;
 
@@ -41,6 +42,10 @@ float thetaRate = 0.0;
 
 float k[4] = {-39.5113,   -3.0546,  -10.5095,   -7.4827}; //Ts = 0.008s
 
+float K1[4] = {-37.7319,   -3.7463,  -12.8162,   -8.5867};
+float K2[4] = { -37.7155   -3.7389  -12.7855   -8.5661};
+float K3[4] = {-37.7319,   -3.7463,  -12.8162,   -8.5867};
+
 float Ts = 8;
 float M = 0.208;
 
@@ -62,6 +67,10 @@ void setup(){
     Serial.begin(115200);
 
     Wire.begin(21,22,800000L);
+
+    fuzzy.setSigmaDegrees(2.0f);
+    fuzzy.set3Gains(K1, K2, K3);
+    fuzzy.setMode(TS_Fuzzy::MF3);
 
     // if (mpu.begin() == 0){
     //   Serial.println("MPU6050 connected.");
@@ -150,8 +159,8 @@ void loop(){
         
       // //-------------------CONTROLADOR LQR---------------------------//
       if (fabs(theta) < SAFE_ANGLE){
-          u = -(k[0]*(theta) + k[1]*thetaRate + k[2]*pendulumPosition + k[3]*pendulumVelocity);
-
+          // u = -(k[0]*(theta) + k[1]*thetaRate + k[2]*pendulumPosition + k[3]*pendulumVelocity);
+          u = fuzzy.computeControl(theta, thetaRate, pendulumPosition, pendulumVelocity);
           Fm = u / 2.0;
           a = Fm / M;
 
