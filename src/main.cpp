@@ -91,7 +91,7 @@ void setup(){
     // Controlador
     // controller.setFuzzyGains(K1, K2, K3, K4, K5);
     // controller.setDeltaGains(Kdelta);
-    tsController.set7Gains(K1, K2, K3, K4, K5, K6, K7);
+    tsController.set3Gains(K1, K2, K3);
 
     //------------------INICIALIZAÇÃO DOS MOTORES---------------//
     stepperStates.enableMotors(EN);
@@ -176,12 +176,12 @@ void controlTask(void *parameter) {
     stepperStates.update();
 
     theta = imu.getIMUAngleY();
-    thetaRate = imu.getFusedRadSpeed();
+    thetaRate = imu.getIMUGyroY();
     pendulumPosition = stepperStates.getRobotPosition();
-    errorPosition = pendulumPosition - refPosition;
+    // errorPosition = pendulumPosition - refPosition;
     pendulumVelocity = stepperStates.getRobotVelocity();
-    delta = stepperStates.getYawAngle();
-    deltaRate = stepperStates.getYawRate();
+    // delta = stepperStates.getYawAngle();
+    // deltaRate = stepperStates.getYawRate();
 
     // controller.updateStates(theta, thetaRate, errorPosition, pendulumVelocity, delta, deltaRate);
     // controller.computeTorques(Ttheta, Tdelta);
@@ -189,7 +189,7 @@ void controlTask(void *parameter) {
     if (fabs(theta) < SAFE_ANGLE){
         // float Tl = 0.5 * Ttheta + 0.5 * Tdelta;
         // float Tr = 0.5 * Ttheta - 0.5 * Tdelta;
-        Ttheta = tsController.computeControl7mf(theta, thetaRate, errorPosition, pendulumVelocity);
+        Ttheta = tsController.computeControl3mf(theta, thetaRate, pendulumPosition, pendulumVelocity);
 
         // float Fm = (Tl+Tr)/2;
         float Fm = Ttheta/2;
