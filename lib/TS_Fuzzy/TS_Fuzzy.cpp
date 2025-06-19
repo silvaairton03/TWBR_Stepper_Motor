@@ -1,7 +1,5 @@
 #include"TS_Fuzzy.h"
 
-
-
 TS_Fuzzy::TS_Fuzzy(){
     sigma = radians(20.0f);
     memset(K, 0, sizeof(K));

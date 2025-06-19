@@ -180,7 +180,7 @@ void loop() {
       float a = Fm / M;
       float vel = lastVel + a * (Ts / 1000.0);
 
-      if (fabs(vel) > 1.0) vel = (vel > 0) ? 1.0 : -1.0;
+      // if (fabs(vel) > 1.0) vel = (vel > 0) ? 1.0 : -1.0;
 
       float controlSteps = (vel * STEPS_PER_REVOLUTION) / (2 * PI * wheelRadius);
 
